@@ -59,7 +59,7 @@ import { FREE_MODELS, generateOpenRouterContent, fetchFreeModels, type OpenRoute
 import { BYTEZ_MODELS, generateBytezContent } from './services/bytezService';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-
+import { SUMOPOD_MODELS, generateSumopodContent } from './services/sumopodService';
 import { SUPER_CLAUDE_SKILLS, SUPER_CLAUDE_COMMANDS, type SuperClaudeSkill } from './constants/superClaude';
 
 function cn(...inputs: ClassValue[]) {
@@ -147,7 +147,7 @@ const GuideModal = ({ onClose }: { onClose: () => void }) => {
               <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400"><Cpu size={20} /></div>
                 <h4 className="font-bold text-white text-[14px]">Multi-Provider AI</h4>
-                <p className="text-[11px] text-gray-400 leading-relaxed">Dukungan penuh untuk Gemini, OpenRouter (Claude, GPT-4), dan Bytez dalam satu interface.</p>
+                <p className="text-[11px] text-gray-400 leading-relaxed">Dukungan penuh untuk Gemini, OpenRouter (Claude, GPT-4), Bytez, dan SumoPod AI.</p>
               </div>
               <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400"><Layout size={20} /></div>
@@ -212,7 +212,7 @@ const GuideModal = ({ onClose }: { onClose: () => void }) => {
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="bg-white/5 p-3 rounded-lg border border-white/10">
                 <h4 className="font-semibold text-white text-sm mb-1">Pilihan Model</h4>
-                <p className="text-xs text-gray-400">Mendukung Google Gemini dan berbagai model dari OpenRouter (Claude, GPT-4, dll).</p>
+                <p className="text-xs text-gray-400">Mendukung Google Gemini, OpenRouter, Bytez, dan SumoPod (termasuk Gemini 2.0 Flash Lite & Claude 4.5).</p>
               </div>
               <div className="bg-white/5 p-3 rounded-lg border border-white/10">
                 <h4 className="font-semibold text-white text-sm mb-1">Super Skills</h4>
@@ -486,13 +486,15 @@ export default function App() {
   const [newMcpName, setNewMcpName] = useState('');
   const [newMcpUrl, setNewMcpUrl] = useState('');
   const [editorFontSize, setEditorFontSize] = useState(14);
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'openrouter' | 'bytez'>('gemini');
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openrouter' | 'bytez' | 'sumopod'>(() => (localStorage.getItem('aiProvider') as any) || 'gemini');
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('aura_gemini_key') || process.env.GEMINI_API_KEY || '');
   const [openRouterApiKey, setOpenRouterApiKey] = useState(() => localStorage.getItem('aura_openrouter_key') || process.env.OPENROUTER_API_KEY || '');
   const [bytezApiKey, setBytezApiKey] = useState(() => localStorage.getItem('aura_bytez_key') || process.env.BYTEZ_API_KEY || '');
+  const [sumopodApiKey, setSumopodApiKey] = useState(() => localStorage.getItem('sumopodApiKey') || '');
   const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const [openRouterModel, setOpenRouterModel] = useState('auto-free');
-  const [bytezModel, setBytezModel] = useState(BYTEZ_MODELS[0].id);
+  const [bytezModel, setBytezModel] = useState(() => localStorage.getItem('bytezModel') || BYTEZ_MODELS[0].id);
+  const [sumopodModel, setSumopodModel] = useState(() => localStorage.getItem('sumopodModel') || SUMOPOD_MODELS[0].id);
   const [dynamicFreeModels, setDynamicFreeModels] = useState<OpenRouterModel[]>(FREE_MODELS);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; data: string; content?: string }[]>([]);
@@ -575,7 +577,11 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('aura_bytez_key', bytezApiKey);
-  }, [bytezApiKey]);
+    localStorage.setItem('bytezModel', bytezModel);
+    localStorage.setItem('sumopodApiKey', sumopodApiKey);
+    localStorage.setItem('sumopodModel', sumopodModel);
+    localStorage.setItem('aiProvider', aiProvider);
+  }, [bytezApiKey, bytezModel, sumopodApiKey, sumopodModel, aiProvider]);
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -817,6 +823,13 @@ Integrations:
       } else if (aiProvider === 'bytez') {
         const googleKey = geminiApiKey || process.env.GEMINI_API_KEY || '';
         content = await generateBytezContent(bytezModel, prompt, bytezApiKey, googleKey, attachedFiles);
+      } else if (aiProvider === 'sumopod') {
+        if (!sumopodApiKey) throw new Error('SumoPod API Key is required. Please set it in Settings.');
+        content = await generateSumopodContent(sumopodApiKey, sumopodModel, [
+          { role: 'system', content: `${systemInstruction}\nRules:\n${aiRules}\n${activeCommandInstruction}` },
+          ...chatMessages.map(m => ({ role: m.role as any, content: m.content })),
+          { role: 'user', content: prompt }
+        ]);
       } else {
         const apiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || '';
         if (!apiKey) throw new Error('OpenRouter API Key is missing. Please set it in Settings.');
@@ -1355,7 +1368,7 @@ Integrations:
               onClick={() => setSidebarTab('settings')}
               title="Settings"
               className={cn("p-2.5 cursor-pointer transition-all duration-200 rounded-xl group relative", sidebarTab === 'settings' ? "text-white bg-blue-600/20 shadow-lg shadow-blue-500/10" : "text-[#858585] hover:text-white hover:bg-white/5")}
-            >
+          >
               <Settings size={24} className={cn("transition-transform duration-200", sidebarTab === 'settings' && "scale-110")} />
               {sidebarTab === 'settings' && <motion.div layoutId="activeTab" className="absolute left-[-12px] w-1 h-8 bg-blue-500 rounded-r-full" />}
             </div>
@@ -1905,8 +1918,9 @@ Integrations:
                           className="w-full bg-[#3c3c3c] border border-white/5 rounded-xl py-2 px-3 text-[13px] focus:outline-none focus:border-blue-500/50 transition-all"
                         >
                           <option value="gemini">Google Gemini</option>
-                          <option value="bytez">Bytez API</option>
-                          <option value="openrouter">OpenRouter</option>
+                          <option value="openrouter">OpenRouter (Free)</option>
+                          <option value="bytez">Bytez AI</option>
+                          <option value="sumopod">SumoPod AI</option>
                         </select>
                       </div>
 
@@ -1975,6 +1989,34 @@ Integrations:
                               className="w-full bg-[#3c3c3c] border border-white/5 rounded-xl py-2 px-3 text-[13px] focus:outline-none focus:border-blue-500/50 transition-all"
                             >
                               {BYTEZ_MODELS.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      ) : aiProvider === 'sumopod' ? (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-[12px] text-[#858585] ml-1">SumoPod API Key</label>
+                            <div className="relative">
+                              <input 
+                                type="password" 
+                                value={sumopodApiKey}
+                                onChange={(e) => setSumopodApiKey(e.target.value)}
+                                placeholder="Enter SumoPod API Key"
+                                className="w-full bg-[#3c3c3c] border border-white/5 rounded-xl py-2 px-3 text-[13px] focus:outline-none focus:border-blue-500/50 transition-all"
+                              />
+                              <Cpu size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-500/50" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[12px] text-[#858585] ml-1">SumoPod Model</label>
+                            <select 
+                              value={sumopodModel}
+                              onChange={(e) => setSumopodModel(e.target.value)}
+                              className="w-full bg-[#3c3c3c] border border-white/5 rounded-xl py-2 px-3 text-[13px] focus:outline-none focus:border-blue-500/50 transition-all"
+                            >
+                              {SUMOPOD_MODELS.map(m => (
                                 <option key={m.id} value={m.id}>{m.name}</option>
                               ))}
                             </select>
