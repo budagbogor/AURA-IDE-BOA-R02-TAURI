@@ -981,6 +981,12 @@ Integrations:
         setTerminalOutput(prev => [...prev, '> aura-project@1.0.0 start', '> vite', '', '  VITE v4.4.9  ready in 123 ms', '', '  ➜  Local:   http://localhost:3000/', '  ➜  Network: use --host to expose']);
       } else if (cmd === 'npm build') {
         setTerminalOutput(prev => [...prev, '> aura-project@1.0.0 build', '> tsc && vite build', '', 'vite v4.4.9 building for production...', 'transforming...', '✓ 123 modules transformed.', 'rendering chunks...', 'dist/index.html                  0.45 kB', 'dist/assets/index-12345678.js    123.45 kB │ gzip: 45.67 kB', 'dist/assets/index-12345678.css   12.34 kB │ gzip: 3.45 kB', '✓ built in 1.23s']);
+      } else if (cmd.startsWith('npm install')) {
+        setTerminalOutput(prev => [...prev, 
+          '[AURA INFO] Fitur "npm install" tidak dapat dijalankan langsung di dalam browser karena batasan keamanan (sandboxing).', 
+          'Silakan jalankan perintah ini di TERMINAL ASLI komputer Anda (PowerShell/CMD).',
+          'Aura IDE hanya mensimulasikan output terminal untuk tujuan visual & workflow.'
+        ]);
       } else {
         setTerminalOutput(prev => [...prev, `Command not found: ${val}`]);
       }
