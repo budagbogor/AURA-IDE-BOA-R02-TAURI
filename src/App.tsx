@@ -42,7 +42,11 @@ import {
   Layout,
   Eye,
   EyeOff,
-  Folder
+  Folder,
+  HelpCircle,
+  BookOpen,
+  Keyboard,
+  FolderTree
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
@@ -77,6 +81,217 @@ interface CodeProblem {
   message: string;
 }
 
+const AuraLogo = ({ size = 28, className = "" }: { size?: number, className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <defs>
+      <linearGradient id="aura-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#3B82F6" />
+        <stop offset="0.5" stopColor="#8B5CF6" />
+        <stop offset="1" stopColor="#10B981" />
+      </linearGradient>
+    </defs>
+    <path d="M16 2L3 28H10.5L16 16L21.5 28H29L16 2Z" fill="url(#aura-grad)" />
+    <path d="M16 16L10.5 28H21.5L16 16Z" fill="#ffffff" opacity="0.2" />
+    <circle cx="16" cy="24" r="2.5" fill="#ffffff" />
+  </svg>
+);
+
+const GuideModal = ({ onClose }: { onClose: () => void }) => {
+  const [activeSection, setActiveSection] = useState('intro');
+
+  const sections = [
+    { id: 'intro', icon: BookOpen, title: 'Pengenalan', desc: 'Selamat datang di Aura IDE' },
+    { id: 'files', icon: FolderTree, title: 'Manajemen File', desc: 'Navigasi & edit kode' },
+    { id: 'ai', icon: Sparkles, title: 'Aura AI', desc: 'Asisten coding pintar' },
+    { id: 'shortcuts', icon: Keyboard, title: 'Shortcut & Perintah', desc: 'Kerja lebih cepat' },
+    { id: 'github', icon: Github, title: 'Integrasi GitHub', desc: 'Version control' },
+    { id: 'settings', icon: Settings, title: 'Pengaturan', desc: 'Kustomisasi IDE' },
+  ];
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'intro':
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <BookOpen className="text-blue-400" /> Pengenalan Aura IDE
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              Aura IDE adalah lingkungan pengembangan terpadu (IDE) berbasis web yang dirancang untuk kecepatan, estetika, dan integrasi AI yang mendalam.
+            </p>
+            <div className="bg-white/5 p-4 rounded-lg border border-white/10 mt-4">
+              <h4 className="font-semibold text-white mb-2">Alur Kerja (Workflow) Ideal:</h4>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-gray-300">
+                <li>Buka <strong>Pengaturan</strong> untuk memasukkan API Key AI Anda.</li>
+                <li>Gunakan <strong>Explorer</strong> untuk membuat struktur file proyek.</li>
+                <li>Buka <strong>Aura AI Chat</strong> untuk meminta bantuan menulis kerangka kode.</li>
+                <li>Gunakan <strong>Command Palette</strong> untuk navigasi cepat antar fitur.</li>
+                <li>Simpan dan sinkronkan ke <strong>GitHub</strong>.</li>
+              </ol>
+            </div>
+          </div>
+        );
+      case 'files':
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <FolderTree className="text-blue-400" /> Manajemen File
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              Panel Explorer (ikon dokumen di kiri) adalah pusat pengelolaan proyek Anda.
+            </p>
+            <ul className="space-y-3 text-sm text-gray-300 mt-4">
+              <li className="flex gap-3"><div className="p-1 bg-white/10 rounded h-fit"><FileCode size={16}/></div> <div><strong>Membuat File:</strong> Klik ikon + di panel Explorer. Beri nama beserta ekstensinya (misal: <code>app.tsx</code>).</div></li>
+              <li className="flex gap-3"><div className="p-1 bg-white/10 rounded h-fit"><Search size={16}/></div> <div><strong>Pencarian Global:</strong> Gunakan tab Search untuk mencari teks di seluruh file proyek Anda.</div></li>
+              <li className="flex gap-3"><div className="p-1 bg-white/10 rounded h-fit"><Download size={16}/></div> <div><strong>Export Proyek:</strong> Anda dapat mengunduh seluruh proyek sebagai file .zip melalui Command Palette.</div></li>
+            </ul>
+          </div>
+        );
+      case 'ai':
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <Sparkles className="text-blue-400" /> Aura AI Assistant
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              Aura AI terintegrasi langsung ke dalam editor untuk membantu Anda menulis, mendebug, dan memahami kode.
+            </p>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                <h4 className="font-semibold text-white text-sm mb-1">Pilihan Model</h4>
+                <p className="text-xs text-gray-400">Mendukung Google Gemini dan berbagai model dari OpenRouter (Claude, GPT-4, dll).</p>
+              </div>
+              <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                <h4 className="font-semibold text-white text-sm mb-1">Super Skills</h4>
+                <p className="text-xs text-gray-400">Ketik <code>/</code> di chat AI untuk menggunakan perintah cepat seperti /explain, /refactor, atau /fix.</p>
+              </div>
+            </div>
+          </div>
+        );
+      case 'shortcuts':
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <Keyboard className="text-blue-400" /> Shortcut & Perintah
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              Tingkatkan produktivitas Anda dengan pintasan keyboard (shortcuts) bawaan.
+            </p>
+            <div className="space-y-2 mt-4">
+              {[
+                { key: 'Ctrl + Shift + P', desc: 'Buka Command Palette (Pusat Perintah)' },
+                { key: 'Ctrl + P', desc: 'Pencarian File Cepat' },
+                { key: 'Ctrl + S', desc: 'Simpan File Aktif' },
+                { key: 'Ctrl + B', desc: 'Tutup/Buka Sidebar' },
+                { key: 'F11', desc: 'Toggle Zen Mode (Fokus Penuh)' },
+              ].map((s, i) => (
+                <div key={i} className="flex items-center justify-between bg-white/5 p-2 rounded border border-white/5">
+                  <span className="text-sm text-gray-300">{s.desc}</span>
+                  <kbd className="bg-black/50 text-blue-300 px-2 py-1 rounded text-xs font-mono border border-white/10">{s.key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'github':
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <Github className="text-blue-400" /> Integrasi GitHub
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              Kelola version control langsung dari IDE tanpa perlu membuka terminal.
+            </p>
+            <ul className="space-y-3 text-sm text-gray-300 mt-4">
+              <li><strong>1. Setup Token:</strong> Masukkan GitHub Personal Access Token di Pengaturan.</li>
+              <li><strong>2. Hubungkan Repo:</strong> Masukkan URL repositori Anda di tab GitHub.</li>
+              <li><strong>3. Commit & Push:</strong> Tulis pesan commit dan klik Push untuk menyinkronkan perubahan kode Anda ke cloud.</li>
+            </ul>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <Settings className="text-blue-400" /> Pengaturan IDE
+            </h3>
+            <p className="text-gray-300 leading-relaxed">
+              Sesuaikan Aura IDE agar sesuai dengan gaya kerja Anda.
+            </p>
+            <div className="space-y-3 text-sm text-gray-300 mt-4">
+              <div className="bg-white/5 p-3 rounded border border-white/10">
+                <strong className="text-white block mb-1">Layout Mode</strong>
+                Pilih antara mode <strong>Klasik</strong> (Sidebar di kiri) atau <strong>Modern</strong> (Sidebar di kanan).
+              </div>
+              <div className="bg-white/5 p-3 rounded border border-white/10">
+                <strong className="text-white block mb-1">API Keys</strong>
+                Tempat menyimpan kunci API untuk Gemini, OpenRouter, dan GitHub secara aman di penyimpanan lokal browser Anda.
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className="bg-[#1e1e1e] w-full max-w-4xl h-[600px] rounded-2xl border border-white/10 shadow-2xl flex overflow-hidden flex-col"
+      >
+        {/* Header */}
+        <div className="h-14 border-b border-white/10 flex items-center justify-between px-6 bg-white/5">
+          <div className="flex items-center gap-3">
+            <div className="p-1.5 bg-blue-500/20 rounded-lg">
+              <BookOpen size={20} className="text-blue-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-white">Panduan Workflow Aura IDE</h2>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-64 border-r border-white/10 bg-black/20 p-4 overflow-y-auto">
+            <div className="space-y-1">
+              {sections.map((sec) => (
+                <button
+                  key={sec.id}
+                  onClick={() => setActiveSection(sec.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-200",
+                    activeSection === sec.id 
+                      ? "bg-blue-600/20 text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10" 
+                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  )}
+                >
+                  <sec.icon size={18} className={activeSection === sec.id ? "text-blue-400" : "text-gray-500"} />
+                  <div>
+                    <div className="font-medium text-sm">{sec.title}</div>
+                    <div className="text-[10px] opacity-60 mt-0.5">{sec.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-8 overflow-y-auto bg-[#1e1e1e]">
+            {renderContent()}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([
     { id: '1', name: 'App.tsx', content: '// Welcome to Aura IDE\nexport default function App() {\n  return <div>Hello World</div>;\n}', language: 'typescript' },
@@ -84,6 +299,7 @@ export default function App() {
   ]);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
   const [commandInput, setCommandInput] = useState('');
   const [fileSearchInput, setFileSearchInput] = useState('');
   const [activeFileId, setActiveFileId] = useState<string>('1');
@@ -119,6 +335,29 @@ export default function App() {
   const [githubToken, setGithubToken] = useState(() => localStorage.getItem('aura_github_token') || '');
   const [githubRepos, setGithubRepos] = useState<any[]>([]);
   const [isFetchingRepos, setIsFetchingRepos] = useState(false);
+
+  const handleCloneRepo = async (repo: any) => {
+    if (!githubToken) return;
+    setIsFetchingRepos(true);
+    setTerminalOutput(prev => [...prev, `[GITHUB] Cloning repository ${repo.full_name}... (This might take a moment)`]);
+    try {
+      const { cloneRepository } = await import('./services/githubService');
+      const clonedFiles = await cloneRepository(githubToken, repo.owner.login, repo.name);
+      if (clonedFiles.length > 0) {
+        setFiles(clonedFiles);
+        setActiveFileId(clonedFiles[0].id);
+        setSidebarTab('files');
+        setTerminalOutput(prev => [...prev, `[GITHUB] Successfully cloned ${clonedFiles.length} files from ${repo.full_name}.`]);
+      } else {
+        setTerminalOutput(prev => [...prev, `[GITHUB] Repository ${repo.full_name} is empty or no supported files found.`]);
+      }
+    } catch (error) {
+      setTerminalOutput(prev => [...prev, `[GITHUB] Error cloning repository: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+    } finally {
+      setIsFetchingRepos(false);
+    }
+  };
+
   const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('aura_supabase_url') || '');
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(() => localStorage.getItem('aura_supabase_key') || '');
   const [supabaseConnected, setSupabaseConnected] = useState(false);
@@ -637,12 +876,18 @@ Integrations:
   };
 
   return (
-    <div 
-      className={cn(
-        "flex h-screen w-full bg-[#1e1e1e] text-[#cccccc] select-none font-sans transition-all duration-300",
-        layoutMode === 'modern' ? "flex-row-reverse" : "flex-row"
-      )}
-    >
+    <div className="flex flex-col h-full w-full bg-[#1e1e1e] text-[#cccccc] select-none font-sans overflow-hidden">
+      <div 
+        className={cn(
+          "flex flex-1 overflow-hidden transition-all duration-300",
+          layoutMode === 'modern' ? "flex-row-reverse" : "flex-row"
+        )}
+      >
+      {/* Guide Modal */}
+      <AnimatePresence>
+        {showGuideModal && <GuideModal onClose={() => setShowGuideModal(false)} />}
+      </AnimatePresence>
+
       {/* Context Menu */}
       <AnimatePresence>
         {contextMenu && (
@@ -800,6 +1045,9 @@ Integrations:
           "w-14 bg-[#333333] flex flex-col items-center py-4 gap-4 z-50 glass-dark",
           layoutMode === 'modern' ? "border-l border-white/5" : "border-r border-white/5"
         )}>
+          <div className="mb-2" title="Aura IDE">
+            <AuraLogo size={32} className="drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+          </div>
           <div 
             onClick={() => setSidebarTab('files')}
             title="Explorer (Ctrl+Shift+E)"
@@ -840,13 +1088,22 @@ Integrations:
             <Globe size={24} className={cn("transition-transform duration-200", sidebarTab === 'browser' && "scale-110")} />
             {sidebarTab === 'browser' && <motion.div layoutId="activeTab" className="absolute left-[-12px] w-1 h-8 bg-blue-500 rounded-r-full" />}
           </div>
-          <div 
-            onClick={() => setSidebarTab('settings')}
-            title="Settings"
-            className={cn("mt-auto p-2.5 cursor-pointer transition-all duration-200 rounded-xl group relative", sidebarTab === 'settings' ? "text-white bg-blue-600/20 shadow-lg shadow-blue-500/10" : "text-[#858585] hover:text-white hover:bg-white/5")}
-          >
-            <Settings size={24} className={cn("transition-transform duration-200", sidebarTab === 'settings' && "scale-110")} />
-            {sidebarTab === 'settings' && <motion.div layoutId="activeTab" className="absolute left-[-12px] w-1 h-8 bg-blue-500 rounded-r-full" />}
+          <div className="mt-auto flex flex-col gap-2 w-full items-center">
+            <div 
+              onClick={() => setShowGuideModal(true)}
+              title="Panduan Workflow"
+              className="p-2.5 cursor-pointer transition-all duration-200 rounded-xl text-[#858585] hover:text-white hover:bg-white/5"
+            >
+              <HelpCircle size={24} />
+            </div>
+            <div 
+              onClick={() => setSidebarTab('settings')}
+              title="Settings"
+              className={cn("p-2.5 cursor-pointer transition-all duration-200 rounded-xl group relative", sidebarTab === 'settings' ? "text-white bg-blue-600/20 shadow-lg shadow-blue-500/10" : "text-[#858585] hover:text-white hover:bg-white/5")}
+            >
+              <Settings size={24} className={cn("transition-transform duration-200", sidebarTab === 'settings' && "scale-110")} />
+              {sidebarTab === 'settings' && <motion.div layoutId="activeTab" className="absolute left-[-12px] w-1 h-8 bg-blue-500 rounded-r-full" />}
+            </div>
           </div>
         </div>
       )}
@@ -1071,7 +1328,7 @@ Integrations:
                     <div ref={chatEndRef} />
                   </div>
 
-                  <div className="p-4 border-t border-white/5 bg-[#252526]/80 backdrop-blur-md">
+                  <div className="p-4 border-t border-white/5 bg-[#252526]/80 backdrop-blur-md flex flex-col">
                     {attachedFiles.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2">
                         {attachedFiles.map((file, i) => (
@@ -1090,7 +1347,7 @@ Integrations:
                         ))}
                       </div>
                     )}
-                    <div className="relative">
+                    <div className="relative flex-1">
                       <textarea 
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
@@ -1101,8 +1358,8 @@ Integrations:
                           }
                         }}
                         placeholder="Ask Aura anything..."
-                        className="w-full bg-[#3c3c3c] border border-white/5 rounded-xl py-3 pl-4 pr-12 text-[13px] focus:outline-none focus:border-blue-500/50 transition-all resize-none min-h-[44px] max-h-32 custom-scrollbar"
-                        rows={1}
+                        className="w-full bg-[#3c3c3c] border border-white/5 rounded-xl py-3 pl-4 pr-12 text-[13px] focus:outline-none focus:border-blue-500/50 transition-all resize-none min-h-[80px] max-h-48 custom-scrollbar"
+                        rows={3}
                       />
                       <div className="absolute right-2 bottom-2 flex gap-1">
                         <button 
@@ -1196,8 +1453,10 @@ Integrations:
                         {githubRepos.map(repo => (
                           <div 
                             key={repo.id}
-                            className="p-3 bg-[#333333]/50 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group"
+                            onClick={() => handleCloneRepo(repo)}
+                            className="p-3 bg-[#333333]/50 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all cursor-pointer group relative overflow-hidden"
                           >
+                            {isFetchingRepos && <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-10"><RefreshCw size={16} className="animate-spin text-blue-400" /></div>}
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[13px] font-medium text-white group-hover:text-blue-400 transition-colors">{repo.name}</span>
                               {repo.private && <span className="text-[9px] px-1.5 py-0.5 bg-white/5 rounded text-[#858585]">Private</span>}
@@ -1790,92 +2049,101 @@ Integrations:
       </div>
 
         {/* Bottom Panel (Terminal & Problems) */}
-        <div className="h-[250px] bg-[#1e1e1e] border-t border-white/10 flex flex-col relative">
-          <div className="flex items-center gap-4 px-4 py-1 text-[11px] uppercase font-bold text-[#858585] border-b border-white/5">
-            <span 
-              onClick={() => setBottomTab('terminal')}
-              className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'terminal' ? "text-white border-b border-white" : "hover:text-white")}
-            >
-              Terminal
-            </span>
-            <span 
-              onClick={() => setBottomTab('problems')}
-              className={cn("cursor-pointer py-1 transition-colors flex items-center gap-1", bottomTab === 'problems' ? "text-white border-b border-white" : "hover:text-white")}
-            >
-              Problems {problems.length > 0 && <span className="bg-red-500 text-white rounded-full px-1 text-[9px]">{problems.length}</span>}
-            </span>
-            <span 
-              onClick={() => setBottomTab('output')}
-              className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'output' ? "text-white border-b border-white" : "hover:text-white")}
-            >
-              Output
-            </span>
-            <span 
-              onClick={() => setBottomTab('debug')}
-              className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'debug' ? "text-white border-b border-white" : "hover:text-white")}
-            >
-              Debug Console
-            </span>
-            
-            <div className="ml-auto flex items-center gap-3">
-              <button 
-                onClick={scanForProblems}
-                disabled={isScanning}
-                className="flex items-center gap-1 text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
-                title="Scan current file for problems"
+        {!zenMode && (
+          <div className="h-[250px] bg-[#1e1e1e] border-t border-white/10 flex flex-col relative">
+            <div className="flex items-center gap-4 px-4 py-1 text-[11px] uppercase font-bold text-[#858585] border-b border-white/5">
+              <span 
+                onClick={() => setBottomTab('terminal')}
+                className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'terminal' ? "text-white border-b border-white" : "hover:text-white")}
               >
-                <RefreshCw size={12} className={cn(isScanning && "animate-spin")} />
-                <span className="text-[10px]">Scan Code</span>
-              </button>
-              <Play size={12} className="text-green-500 cursor-pointer" />
-              <X size={12} className="cursor-pointer" />
+                Terminal
+              </span>
+              <span 
+                onClick={() => setBottomTab('problems')}
+                className={cn("cursor-pointer py-1 transition-colors flex items-center gap-1", bottomTab === 'problems' ? "text-white border-b border-white" : "hover:text-white")}
+              >
+                Problems {problems.length > 0 && <span className="bg-red-500 text-white rounded-full px-1 text-[9px]">{problems.length}</span>}
+              </span>
+              <span 
+                onClick={() => setBottomTab('output')}
+                className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'output' ? "text-white border-b border-white" : "hover:text-white")}
+              >
+                Output
+              </span>
+              <span 
+                onClick={() => setBottomTab('debug')}
+                className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'debug' ? "text-white border-b border-white" : "hover:text-white")}
+              >
+                Debug Console
+              </span>
+              
+              <div className="ml-auto flex items-center gap-3">
+                <button 
+                  onClick={scanForProblems}
+                  disabled={isScanning}
+                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+                  title="Scan current file for problems"
+                >
+                  <RefreshCw size={12} className={cn(isScanning && "animate-spin")} />
+                  <span className="text-[10px]">Scan Code</span>
+                </button>
+                <Play size={12} className="text-green-500 cursor-pointer" />
+                <X size={12} className="cursor-pointer" />
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto bg-black/20">
+              {renderBottomPanel()}
             </div>
           </div>
-          
-          <div className="flex-1 overflow-y-auto bg-black/20">
-            {renderBottomPanel()}
-          </div>
-        </div>
+        )}
+      </div>
       </div>
 
-      {/* Status Bar */}
-      <div className="fixed bottom-0 left-0 right-0 h-6 bg-[#007acc] text-white flex items-center px-3 text-[11px] gap-4 z-50 shadow-2xl backdrop-blur-md bg-opacity-90">
-        <div className="flex items-center gap-1 hover:bg-white/10 px-2 h-full cursor-pointer transition-colors">
-          <ChevronRight size={12} />
-          <span className="font-medium">main*</span>
+      {/* Status Bar & Footer */}
+      <div className="z-50 flex flex-col shrink-0">
+        <div className="h-6 bg-[#007acc] text-white flex items-center px-3 text-[11px] gap-4 shadow-2xl backdrop-blur-md bg-opacity-90">
+          <div className="flex items-center gap-1 hover:bg-white/10 px-2 h-full cursor-pointer transition-colors">
+            <ChevronRight size={12} />
+            <span className="font-medium">main*</span>
+          </div>
+          <div className="flex items-center gap-3 hover:bg-white/10 px-2 h-full cursor-pointer transition-colors">
+            <div className="flex items-center gap-1">
+              <X size={12} className="text-white/70" />
+              <span>0</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <AlertTriangle size={12} className="text-white/70" />
+              <span>{problems.length}</span>
+            </div>
+          </div>
+          <div className="ml-auto flex items-center h-full">
+            <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10 text-white/70 italic">
+              Ctrl+Shift+P for Commands
+            </div>
+            <div 
+              onClick={() => setZenMode(!zenMode)}
+              className={cn(
+                "hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10",
+                zenMode && "bg-white/20 text-blue-200"
+              )}
+              title="Toggle Zen Mode"
+            >
+              {zenMode ? <EyeOff size={12} className="mr-1" /> : <Eye size={12} className="mr-1" />}
+              Zen
+            </div>
+            <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10">Spaces: 2</div>
+            <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10 uppercase tracking-tighter opacity-80">UTF-8</div>
+            <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10 font-bold uppercase tracking-widest text-[10px]">{activeFile.language}</div>
+            <div className="flex items-center gap-2 hover:bg-white/10 px-3 h-full cursor-pointer transition-colors border-l border-white/10 bg-white/5" title={`Active Model: ${aiProvider === 'gemini' ? selectedModel : openRouterModel}`}>
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
+              <span className="font-black tracking-tighter">AURA AI ONLINE</span>
+              <span className="text-white/70 text-[10px] ml-1">({aiProvider === 'gemini' ? selectedModel : openRouterModel})</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3 hover:bg-white/10 px-2 h-full cursor-pointer transition-colors">
-          <div className="flex items-center gap-1">
-            <X size={12} className="text-white/70" />
-            <span>0</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <AlertTriangle size={12} className="text-white/70" />
-            <span>{problems.length}</span>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center h-full">
-          <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10 text-white/70 italic">
-            Ctrl+Shift+P for Commands
-          </div>
-          <div 
-            onClick={() => setZenMode(!zenMode)}
-            className={cn(
-              "hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10",
-              zenMode && "bg-white/20 text-blue-200"
-            )}
-            title="Toggle Zen Mode"
-          >
-            {zenMode ? <EyeOff size={12} className="mr-1" /> : <Eye size={12} className="mr-1" />}
-            Zen
-          </div>
-          <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10">Spaces: 2</div>
-          <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10 uppercase tracking-tighter opacity-80">UTF-8</div>
-          <div className="hover:bg-white/10 px-3 h-full flex items-center cursor-pointer transition-colors border-l border-white/10 font-bold uppercase tracking-widest text-[10px]">{activeFile.language}</div>
-          <div className="flex items-center gap-2 hover:bg-white/10 px-3 h-full cursor-pointer transition-colors border-l border-white/10 bg-white/5">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
-            <span className="font-black tracking-tighter">AURA AI ONLINE</span>
-          </div>
+        <div className="h-5 bg-[#1e1e1e] border-t border-white/5 flex items-center justify-center text-[10px] text-[#858585]">
+          &copy; 2026 B.O.A. Indonesia
         </div>
       </div>
     </div>
