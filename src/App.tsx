@@ -389,6 +389,7 @@ export default function App() {
   const [fileSearchInput, setFileSearchInput] = useState('');
   const [activeFileId, setActiveFileId] = useState<string>('');
   const [layoutMode, setLayoutMode] = useState<'classic' | 'modern'>('classic');
+  const [projectName, setProjectName] = useState('AURA-PROJECT');
   const activeFile = files.find(f => f.id === activeFileId) || (files.length > 0 ? files[0] : null);
 
 
@@ -433,6 +434,7 @@ export default function App() {
       if (clonedFiles.length > 0) {
         setFiles(clonedFiles);
         setActiveFileId(clonedFiles[0].id);
+        setProjectName(repo.name.toUpperCase());
         setSidebarTab('files');
         setTerminalOutput(prev => [...prev, `[GITHUB] Successfully cloned ${clonedFiles.length} files from ${repo.full_name}.`]);
       } else {
@@ -448,6 +450,7 @@ export default function App() {
   const closeFolder = () => {
     setFiles([]);
     setActiveFileId('');
+    setProjectName('AURA-PROJECT');
     setTerminalOutput(prev => [...prev, 'Folder closed.']);
   };
 
@@ -1051,6 +1054,26 @@ Integrations:
 
   return (
     <div className="flex flex-col h-full w-full bg-[#1e1e1e] text-[#cccccc] select-none font-sans overflow-hidden">
+      {/* Top Title Bar */}
+      {!zenMode && (
+        <div className="h-8 bg-[#181818] border-b border-white/5 flex items-center justify-between px-4 z-[60]">
+          <div className="flex items-center gap-2">
+            <AuraLogo size={14} />
+            <span className="text-[10px] font-bold tracking-widest text-[#858585] uppercase">Aura AI IDE</span>
+          </div>
+          
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+            <Folder size={12} className="text-blue-500" />
+            <span className="text-[11px] font-bold text-[#cccccc]">{projectName}</span>
+          </div>
+
+          <div className="flex items-center gap-4 text-[11px] text-[#858585]">
+            <span className="hover:text-white cursor-pointer transition-colors" onClick={() => setShowGuideModal(true)}>Guide</span>
+            <span className="hover:text-white cursor-pointer transition-colors" onClick={() => setShowCommandPalette(true)}>Commands</span>
+          </div>
+        </div>
+      )}
+
       <div 
         className={cn(
           "flex flex-1 overflow-hidden transition-all duration-300",
@@ -2275,7 +2298,7 @@ Integrations:
               {/* Breadcrumbs */}
               <div className="h-7 bg-[#1e1e1e] flex items-center px-4 gap-2 text-[11px] text-[#858585] border-b border-white/5">
                 <Folder size={12} />
-                <span>aura-project</span>
+                <span>{projectName.toLowerCase()}</span>
                 <ChevronRight size={10} />
                 {getFileIcon(activeFile.name)}
                 <span className="text-[#cccccc] font-medium">{activeFile.name}</span>
