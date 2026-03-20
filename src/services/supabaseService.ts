@@ -42,7 +42,7 @@ export const testSupabaseConnection = async (config: SupabaseConfig) => {
     
     // Validate that the request actually returned OpenAPI spec typical of Supabase REST
     const data = await response.json();
-    if (!data || !data.openapi) {
+    if (!data || (!data.openapi && !data.swagger && !data.info)) {
       throw new Error('Invalid response from Supabase REST API.');
     }
 
