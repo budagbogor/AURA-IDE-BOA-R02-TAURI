@@ -39,4 +39,3 @@ jobs:
           releaseBody: 'Official Windows Installer for Aura AI IDE.'
           releaseDraft: false
           prerelease: false
-          build-script: build:tauri
