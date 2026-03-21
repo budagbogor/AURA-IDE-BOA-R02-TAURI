@@ -1335,50 +1335,85 @@ Integrations:
     if (isTauri && TauriCommand) {
       if (!nativeProjectPath) {
         setTerminalOutput(prev => [...prev, 
-          '[AURA INFO] Terminal Native terdeteksi, tetapi folder proyek belum dibuka secara Native.',
-          'Silakan klik Ikon Folder Kuning di sidebar untuk memilih folder agar perintah seperti "npm" berjalan di lokasi yang benar.'
+          '[AURA INFO] Folder proyek belum dibuka secara Native.',
+          'Klik tombol "Open Folder Proyek (Native - Support Terminal/NPM)" di toolbar Explorer.'
         ]);
         return;
       }
 
       try {
-        const fullCmd = TauriCommand.create('powershell', ['-Command', val], {
-          cwd: nativeProjectPath
+        // Tauri v2 plugin-shell: Use Command.create with spawn()
+        // Output is captured by listening to child process events
+        const child = await TauriCommand.create(
+          'powershell',
+          ['-NoProfile', '-NonInteractive', '-Command', val],
+          { cwd: nativeProjectPath }
+        ).spawn();
+
+        // Listen to stdout line by line
+        child.stdout.on('data', (line: string) => {
+          if (line && line.trim()) {
+            setTerminalOutput(prev => [...prev, line]);
+          }
         });
-        
-        if (fullCmd.onStdout && typeof fullCmd.onStdout.addListener === 'function') {
-          fullCmd.onStdout.addListener((data: string) => {
-            setTerminalOutput(prev => [...prev, data]);
-          });
-        }
 
-        if (fullCmd.onStderr && typeof fullCmd.onStderr.addListener === 'function') {
-          fullCmd.onStderr.addListener((data: string) => {
-            setTerminalOutput(prev => [...prev, `[ERROR] ${data}`]);
-          });
-        }
+        // Listen to stderr line by line
+        child.stderr.on('data', (line: string) => {
+          if (line && line.trim()) {
+            setTerminalOutput(prev => [...prev, `[ERR] ${line}`]);
+          }
+        });
 
-        await fullCmd.spawn();
-        return;
-      } catch (err) {
+        // Listen for process exit
+        child.on('close', (data: { code: number | null }) => {
+          const code = data?.code;
+          if (code === 0) {
+            setTerminalOutput(prev => [...prev, `✓ Selesai (exit code: 0)`]);
+          } else if (code !== null) {
+            setTerminalOutput(prev => [...prev, `✗ Proses selesai dengan exit code: ${code}`]);
+          }
+        });
+
+        return; // Async streaming, do not fall to simulator
+      } catch (err: any) {
         console.error('Tauri Shell Error:', err);
-        setTerminalOutput(prev => [...prev, `[SYSTEM ERROR] Gagal menjalankan Terminal Native: ${err instanceof Error ? err.message : 'Unknown error'}`]);
+        // Try fallback: use output() instead of spawn() for simpler commands
+        try {
+          const output = await TauriCommand.create(
+            'powershell',
+            ['-NoProfile', '-NonInteractive', '-Command', val],
+            { cwd: nativeProjectPath }
+          ).execute();
+          if (output.stdout) {
+            output.stdout.split('\n').filter((l: string) => l.trim()).forEach((line: string) => {
+              setTerminalOutput(prev => [...prev, line]);
+            });
+          }
+          if (output.stderr) {
+            output.stderr.split('\n').filter((l: string) => l.trim()).forEach((line: string) => {
+              setTerminalOutput(prev => [...prev, `[ERR] ${line}`]);
+            });
+          }
+          return;
+        } catch (err2: any) {
+          setTerminalOutput(prev => [...prev, `[SYSTEM ERROR] ${err2?.message || 'Gagal menjalankan perintah native. Pastikan izin Shell sudah dikonfigurasi.'}`]);
+        }
       }
     }
     
-    // Fallback Simulator (Web Mode)
+    // Fallback Simulator (Web Mode or Tauri without path)
     const cmd = val.toLowerCase();
     if (cmd === 'clear') {
       setTerminalOutput([]);
     } else if (cmd === 'ls') {
       setTerminalOutput(prev => [...prev, files.map(f => f.name).join('  ')]);
     } else if (cmd === 'help') {
-      setTerminalOutput(prev => [...prev, 'Available commands: clear, ls, help, scan, build, date, aura --version, whoami, neofetch, git status, git branch, npm start, npm build, npm install']);
+      setTerminalOutput(prev => [...prev, 'Available: clear, ls, help, scan, build, date, aura --version, whoami, neofetch, git status, npm install, npm run dev']);
     } else if (cmd === 'scan') {
       scanForProblems();
     } else if (cmd === 'date') {
       setTerminalOutput(prev => [...prev, new Date().toLocaleString()]);
-    } else if (cmd === 'build' || cmd === 'npm build') {
+    } else if (cmd === 'build' || cmd === 'npm run build') {
       setTerminalOutput(prev => [...prev, '> aura-project@1.0.0 build', '> tsc && vite build', '', 'vite v4.4.9 building for production...', '✓ built in 1.23s']);
     } else if (cmd === 'aura --version') {
       setTerminalOutput(prev => [...prev, 'Aura IDE v3.9.2 (Professional Desktop)']);
@@ -1388,26 +1423,14 @@ Integrations:
       setTerminalOutput(prev => [...prev, 
         '      .---.      OS: Windows 11 / AuraOS 3.9.2',
         '     /     \\     Host: Aura Native Desktop',
-        '    | () () |    Kernel: Native Bridge Active',
-        '     \\  ^  /     Uptime: system-managed',
-        '      |||||      Shell: PowerShell (via Aura)',
-        '      |||||      Resolution: native-detected'
+        '    | () () |    Kernel: Native Bridge',
+        '      |||||      Shell: PowerShell (Simulated in Web Mode)'
       ]);
-    } else if (cmd.startsWith('git')) {
+    } else if (cmd.startsWith('git') || cmd.startsWith('npm')) {
       if (isTauri) {
-        setTerminalOutput(prev => [...prev, '[AURA INFO] Perintah "git" terdeteksi tetapi gagal dieksekusi secara Native. Pastikan folder sudah dibuka secara Native (Ikon Kuning).']);
+        setTerminalOutput(prev => [...prev, `[AURA INFO] Perintah "${cmd.split(' ')[0]}" perlu folder proyek terbuka secara Native. Klik "Open Folder Proyek (Native)" di toolbar Explorer.`]);
       } else {
-        setTerminalOutput(prev => [...prev, '[SIMULATOR] Untuk menggunakan Git asli, silakan instal Aura IDE versi Desktop (.exe) dan buka folder secara Native.']);
-      }
-    } else if (cmd.startsWith('npm')) {
-      if (isTauri) {
-        setTerminalOutput(prev => [...prev, '[AURA INFO] Perintah "npm" terdeteksi tetapi gagal dieksekusi secara Native. Pastikan folder sudah dibuka secara Native (Ikon Kuning).']);
-      } else {
-        setTerminalOutput(prev => [...prev, 
-          '[AURA INFO] Fitur "npm" sungguhan hanya aktif di versi Desktop Aplikasi.', 
-          'Di mode Web, kami hanya menampilkan simulasi terminal untuk visualisasi.',
-          'Silakan unduh installer .exe dari GitHub Releases untuk akses terminal sistem penuh.'
-        ]);
+        setTerminalOutput(prev => [...prev, '[SIMULATOR] Fitur ini hanya aktif di versi Desktop (.exe). Unduh dari GitHub Releases.']);
       }
     } else {
       setTerminalOutput(prev => [...prev, `Command not found: ${val}`]);
