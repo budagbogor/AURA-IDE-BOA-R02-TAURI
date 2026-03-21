@@ -1241,6 +1241,9 @@ Integrations:
     // If running in Tauri Desktop mode, try real execution
     if (isTauri && TauriCommand && nativeProjectPath) {
       try {
+        // Normalisasi Path Windows (Sangat penting untuk CMD/PowerShell di Windows)
+        const normalizedCwd = nativeProjectPath.replace(/\//g, '\\');
+
         // Kill existing process if any
         if (activeProcessRef.current) {
           try {
@@ -1253,38 +1256,57 @@ Integrations:
         setCommandHistory(prev => [val, ...prev.filter(h => h !== val)].slice(0, 50));
         setHistoryIndex(-1);
 
+        // --- INTERNAL DIAGNOSTIC COMMANDS ---
+        if (val.trim() === 'aura diagnostic') {
+          appendOutput(`[DIAGNOSTIC] OS: Windows`);
+          appendOutput(`[DIAGNOSTIC] CWD Raw: ${nativeProjectPath}`);
+          appendOutput(`[DIAGNOSTIC] CWD Normalized: ${normalizedCwd}`);
+          appendOutput(`[DIAGNOSTIC] Tauri Shell Plugin: Loaded`);
+          appendOutput(`[DIAGNOSTIC] Shell Fallback: Direct -> PowerShell -> CMD`);
+          return;
+        }
+
+        if (val.trim() === 'aura env' || val.trim() === 'env') {
+          appendOutput(`[ENV] PATH: ${typeof process !== 'undefined' ? process.env?.PATH : 'Browser/Restricted'}`);
+          return;
+        }
+
         const parts = val.trim().split(/\s+/);
         const mainCmd = parts[0];
         const args = parts.slice(1);
 
-        // --- TRIPLE FALLBACK STRATEGY ---
+        // --- TRIPLE FALLBACK STRATEGY (V1.1.9) ---
         let child;
-        let lastError = null;
+        let lastError: any = null;
 
-        // 1. Try direct command execution
+        // 1. Try direct command execution (e.g., npm.cmd for Windows)
         try {
-          child = await TauriCommand.create(mainCmd, args, { cwd: nativeProjectPath }).spawn();
+          // On Windows, 'npm' usually needs to be 'npm.cmd' if not using a shell
+          const binary = (mainCmd === 'npm' || mainCmd === 'git') ? `${mainCmd}.cmd` : mainCmd;
+          child = await TauriCommand.create(binary, args, { cwd: normalizedCwd }).spawn();
         } catch (e: any) {
           lastError = e;
-          // 2. Try powershell fallback
+          // 2. Try powershell fallback (Inherit env better)
           try {
             child = await TauriCommand.create(
               'powershell',
               ['-NoProfile', '-NonInteractive', '-Command', val],
-              { cwd: nativeProjectPath }
+              { cwd: normalizedCwd }
             ).spawn();
           } catch (e2: any) {
             lastError = e2;
-            // 3. Try cmd.exe fallback (often more robust for .cmd/.bat files like npm)
+            // 3. Try cmd.exe fallback (Absolute fallback)
             try {
               child = await TauriCommand.create(
                 'cmd',
                 ['/C', val],
-                { cwd: nativeProjectPath }
+                { cwd: normalizedCwd }
               ).spawn();
             } catch (e3: any) {
               lastError = e3;
-              throw new Error(`Semua metode eksekusi gagal. Error terakhir: ${e3.message || 'Unknown'}`);
+              // Final Error with STRINGIFIED data for root cause analysis
+              const errorData = JSON.stringify(e3, Object.getOwnPropertyNames(e3));
+              throw new Error(`Semua metode gagal. Data: ${errorData}`);
             }
           }
         }
