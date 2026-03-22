@@ -32,27 +32,27 @@
     {
       "identifier": "shell:allow-spawn",
       "allow": [
-        { "cmd": "npm", "args": true },
-        { "cmd": "npm.cmd", "args": true },
-        { "cmd": "git", "args": true },
-        { "cmd": "node", "args": true },
-        { "cmd": "cmd", "args": true },
-        { "cmd": "cmd.exe", "args": true },
-        { "cmd": "powershell", "args": true },
-        { "cmd": "powershell.exe", "args": true }
+        { "name": "npm", "cmd": "npm", "args": true },
+        { "name": "npm.cmd", "cmd": "npm.cmd", "args": true },
+        { "name": "git", "cmd": "git", "args": true },
+        { "name": "node", "cmd": "node", "args": true },
+        { "name": "cmd", "cmd": "cmd", "args": true },
+        { "name": "cmd.exe", "cmd": "cmd.exe", "args": true },
+        { "name": "powershell", "cmd": "powershell", "args": true },
+        { "name": "powershell.exe", "cmd": "powershell.exe", "args": true }
       ]
     },
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        { "cmd": "npm", "args": true },
-        { "cmd": "npm.cmd", "args": true },
-        { "cmd": "git", "args": true },
-        { "cmd": "node", "args": true },
-        { "cmd": "cmd", "args": true },
-        { "cmd": "cmd.exe", "args": true },
-        { "cmd": "powershell", "args": true },
-        { "cmd": "powershell.exe", "args": true }
+        { "name": "npm", "cmd": "npm", "args": true },
+        { "name": "npm.cmd", "cmd": "npm.cmd", "args": true },
+        { "name": "git", "cmd": "git", "args": true },
+        { "name": "node", "cmd": "node", "args": true },
+        { "name": "cmd", "cmd": "cmd", "args": true },
+        { "name": "cmd.exe", "cmd": "cmd.exe", "args": true },
+        { "name": "powershell", "cmd": "powershell", "args": true },
+        { "name": "powershell.exe", "cmd": "powershell.exe", "args": true }
       ]
     }
   ]
