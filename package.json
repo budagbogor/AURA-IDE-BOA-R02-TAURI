@@ -2,6 +2,9 @@
   "name": "aura-ide",
   "private": true,
   "version": "8.0.0",
+  "description": "Aura AI IDE - Professional Hybrid Development Environment",
+  "author": "B.O.A. Indonesia",
+  "main": "src-electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -13,7 +16,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron src-electron/main.js\"",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron src-electron/main.cjs\"",
     "electron:build": "npm run build && electron-builder"
   },
   "build": {
