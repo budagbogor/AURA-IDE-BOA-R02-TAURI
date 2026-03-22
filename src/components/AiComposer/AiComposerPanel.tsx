@@ -68,15 +68,27 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
       
       let fullResponse = '';
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
+      
+      let lastUpdateTime = Date.now();
       for await (const chunk of stream) {
         fullResponse += chunk;
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1].content = fullResponse;
-          return newMessages;
-        });
+        const now = Date.now();
+        if (now - lastUpdateTime > 50) {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].content = fullResponse;
+            return newMessages;
+          });
+          lastUpdateTime = now;
+        }
       }
+
+      // Final render to print everything gracefully
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1].content = fullResponse;
+        return newMessages;
+      });
 
       // After stream finished, parse for files
       const parsedFiles = parseComposerResponse(fullResponse);

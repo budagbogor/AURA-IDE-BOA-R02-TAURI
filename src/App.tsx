@@ -943,14 +943,27 @@ Integrations:
         let fullResponse = '';
         try {
           const stream = generateGeminiStream(apiKey, selectedModel, prompt, attachedFiles, chatMessages);
+          let lastUpdateTime = Date.now();
+          
           for await (const chunk of stream) {
             fullResponse += chunk;
-            setChatMessages(prev => {
-              const newMsgs = [...prev];
-              newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
-              return newMsgs;
-            });
+            const now = Date.now();
+            if (now - lastUpdateTime > 50) {
+              setChatMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
+                return newMsgs;
+              });
+              lastUpdateTime = now;
+            }
           }
+          
+          // Final update to guarantee the last chunk is rendered
+          setChatMessages(prev => {
+            const newMsgs = [...prev];
+            newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
+            return newMsgs;
+          });
         } catch (streamErr: any) {
           console.error('Stream Error:', streamErr);
           setChatMessages(prev => {
