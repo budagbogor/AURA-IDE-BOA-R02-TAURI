@@ -14,6 +14,7 @@ interface AiComposerPanelProps {
   activeFileId: string;
   onApplyCode: (filePath: string, content: string) => void;
   appendTerminalOutput?: (msg: string) => void;
+  projectTree?: string;
 }
 
 interface Message {
@@ -29,7 +30,8 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
   files,
   activeFileId,
   onApplyCode,
-  appendTerminalOutput
+  appendTerminalOutput,
+  projectTree
 }) => {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Halo! Saya adalah Aura AI Composer. Ketik permintaan Anda, dan saya akan membuat/mengedit kode untuk Anda.' }
@@ -64,7 +66,7 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
     try {
       if (appendTerminalOutput) appendTerminalOutput(`[AI] Menyusun rencana untuk: ${userMessage.substring(0, 30)}...`);
       
-      const stream = generateComposerStream(provider, apiKey, model, userMessage, files, category, activeFileId);
+      const stream = generateComposerStream(provider, apiKey, model, userMessage, files, category, activeFileId, projectTree);
       
       let fullResponse = '';
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);

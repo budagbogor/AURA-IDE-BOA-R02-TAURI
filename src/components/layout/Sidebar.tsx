@@ -483,6 +483,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   files={files}
                   activeFileId={activeFileId}
                   appendTerminalOutput={appendTerminalOutput}
+                  projectTree={files.map(f => f.id).join('\n')}
                   onApplyCode={(path, content) => {
                     setFiles(prev => {
                       const exists = prev.find(f => f.id === path || f.name === path);
