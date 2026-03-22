@@ -36,6 +36,8 @@ interface SidebarProps {
   setFileSearchInput: (input: string) => void;
   chatMessages: ChatMessage[];
   setChatMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+  composerMessages: any[];
+  setComposerMessages: React.Dispatch<React.SetStateAction<any[]>>;
   chatInput: string;
   setChatInput: (input: string) => void;
   isAiLoading: boolean;
@@ -148,6 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   sidebarWidth, setSidebarWidth, isResizingSidebar, setIsResizingSidebar,
   setShowGuideModal, files, setFiles, activeFileId, setActiveFileId,
   fileSearchInput, setFileSearchInput, chatMessages, setChatMessages,
+  composerMessages, setComposerMessages,
   chatInput, setChatInput, isAiLoading, handleSendMessage,
   attachedFiles, setAttachedFiles, removeAttachment, handleFileUpload,
   fileInputRef, chatEndRef, githubUser, githubConnected, setGithubConnected,
@@ -484,6 +487,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   activeFileId={activeFileId}
                   appendTerminalOutput={appendTerminalOutput}
                   projectTree={files.map(f => f.id).join('\n')}
+                  messages={composerMessages}
+                  setMessages={setComposerMessages}
                   onApplyCode={(path, content) => {
                     setFiles(prev => {
                       const exists = prev.find(f => f.id === path || f.name === path);

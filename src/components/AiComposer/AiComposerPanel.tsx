@@ -15,6 +15,8 @@ interface AiComposerPanelProps {
   onApplyCode: (filePath: string, content: string) => void;
   appendTerminalOutput?: (msg: string) => void;
   projectTree?: string;
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
 interface Message {
@@ -31,11 +33,10 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
   activeFileId,
   onApplyCode,
   appendTerminalOutput,
-  projectTree
+  projectTree,
+  messages,
+  setMessages
 }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Halo! Saya adalah Aura AI Composer. Ketik permintaan Anda, dan saya akan membuat/mengedit kode untuk Anda.' }
-  ]);
   const [input, setInput] = useState('');
   const [category, setCategory] = useState('Auto');
   const [isLoading, setIsLoading] = useState(false);

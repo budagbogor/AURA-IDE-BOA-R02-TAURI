@@ -263,6 +263,9 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'Welcome to **Aura AI IDE**. I am your coding assistant. How can I help you today?' }
   ]);
+  const [composerMessages, setComposerMessages] = useState<any[]>([
+    { role: 'assistant', content: 'Halo! Saya adalah Aura AI Composer. Ketik permintaan Anda, dan saya akan membuat/mengedit kode untuk Anda.' }
+  ]);
   const [chatInput, setChatInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([
@@ -1707,6 +1710,8 @@ Integrations:
         setFileSearchInput={setFileSearchInput}
         chatMessages={chatMessages}
         setChatMessages={setChatMessages}
+        composerMessages={composerMessages}
+        setComposerMessages={setComposerMessages}
         chatInput={chatInput}
         setChatInput={setChatInput}
         isAiLoading={isAiLoading}
