@@ -53,7 +53,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   setHistoryIndex
 }) => {
   const currentSession = terminalSessions.find(s => s.id === activeTerminalId) || terminalSessions[0];
-  const displayPath = nativeProjectPath ? (nativeProjectPath.split(/[\\/]/).pop() || nativeProjectPath) : 'aura-project';
+  const displayPath = nativeProjectPath || '~/aura-project';
 
   if (zenMode) return null;
 
@@ -100,23 +100,24 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
 
             {/* Terminal Output */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-              <div className="text-emerald-400 font-bold text-[11px] opacity-70 mb-2">Aura Terminal v4.0.0 (Cursor Core)</div>
+              <div className="text-emerald-400 font-bold text-[11px] opacity-70 mb-2">Aura Terminal v5.0 — PowerShell Engine</div>
               {currentSession?.output?.map((line: string, i: number) => (
                 <div key={i} className="flex gap-2">
                   {line.includes(' $ ') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-emerald-500">➜</span>
-                      <span className="text-blue-400 font-bold">{line.split(' $ ')[0].replace('aura-project', displayPath)}</span>
-                      <span className="text-gray-500">$</span>
-                      <span className="text-white ml-1">{line.split(' $ ')[1]}</span>
+                      <span className="text-blue-400 font-bold text-[12px]">{line.split(' $ ')[0]}</span>
+                      <span className="text-gray-600">$</span>
+                      <span className="text-white ml-1">{line.split(' $ ').slice(1).join(' $ ')}</span>
                     </div>
                   ) : (
                     <div className={cn(
-                       "whitespace-pre-wrap break-all",
+                       "whitespace-pre-wrap break-all leading-5",
                        line.startsWith('Command not found') ? "text-red-400" : 
-                       line.startsWith('[ERR]') ? "text-red-500" :
-                       line.startsWith('✓') ? "text-emerald-400" :
-                       line.startsWith('✗') ? "text-red-400" :
+                       line.startsWith('[ERROR]') ? "text-red-500" :
+                       line.startsWith('[INFO]') ? "text-blue-400" :
+                       line.startsWith('✓') || line.startsWith('Process exited with code 0') ? "text-emerald-400" :
+                       line.startsWith('Process exited') ? "text-yellow-500" :
                        "text-[#cccccc]"
                     )}>{line}</div>
                   )}
@@ -128,8 +129,8 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
             <div className="flex items-center text-white border-t border-white/5 px-2 py-1.5 bg-black/20 font-mono">
               <div className="flex items-center shrink-0">
                 <span className="text-emerald-500 mr-1">➜</span>
-                <span className="text-blue-400 font-bold">{displayPath}</span>
-                <span className="text-gray-500 ml-1">$</span>
+                <span className="text-blue-400 font-bold text-[12px] truncate max-w-[300px]" title={displayPath}>{displayPath}</span>
+                <span className="text-gray-600 ml-1">$</span>
               </div>
               <input 
                  type="text" 
@@ -155,12 +156,16 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                        setHistoryIndex(-1);
                        setTerminalInput('');
                      }
+                   } else if (e.key === 'c' && e.ctrlKey) {
+                     // Ctrl+C to kill running process
+                     e.preventDefault();
+                     setTerminalInput('');
                    } else {
                      handleTerminalCommand(e);
                    }
                  }}
-                 className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder:text-gray-700/50 ml-2"
-                 placeholder="type command..."
+                 className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder:text-gray-700/50 ml-2 caret-white"
+                 placeholder="ketik perintah..."
                  autoFocus
               />
             </div>

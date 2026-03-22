@@ -1335,19 +1335,18 @@ Integrations:
       appendTerminalOutput(data, sessionId);
     };
 
-    appendOutput(`aura-project $ ${val}`);
+    // Build a VSCode-like prompt with full path
+    const cwdDisplay = nativeProjectPath || 'aura-project';
+    appendOutput(`${cwdDisplay} $ ${val}`);
 
-    // If running in Tauri Desktop mode, try real execution
+    // If running in Tauri Desktop mode, use PowerShell as the universal shell (like VSCode)
     if (isTauri && TauriCommand && nativeProjectPath) {
       try {
-        // Normalisasi Path Windows (Sangat penting untuk CMD/PowerShell di Windows)
         const normalizedCwd = nativeProjectPath.replace(/\//g, '\\');
 
         // Kill existing process if any
         if (activeProcessRef.current) {
-          try {
-            await activeProcessRef.current.kill();
-          } catch (e) {}
+          try { await activeProcessRef.current.kill(); } catch (e) {}
           activeProcessRef.current = null;
         }
 
@@ -1355,62 +1354,68 @@ Integrations:
         setCommandHistory(prev => [val, ...prev.filter(h => h !== val)].slice(0, 50));
         setHistoryIndex(-1);
 
-        // --- INTERNAL DIAGNOSTIC COMMANDS ---
+        // --- BUILT-IN COMMANDS (handled locally, no shell needed) ---
+        if (val.trim() === 'clear' || val.trim() === 'cls') {
+          setTerminalSessions(prev => prev.map(s => s.id === sessionId ? { ...s, output: [] } : s));
+          return;
+        }
         if (val.trim() === 'aura diagnostic') {
           appendOutput(`[DIAGNOSTIC] OS: Windows`);
-          appendOutput(`[DIAGNOSTIC] CWD Raw: ${nativeProjectPath}`);
-          appendOutput(`[DIAGNOSTIC] CWD Normalized: ${normalizedCwd}`);
+          appendOutput(`[DIAGNOSTIC] CWD: ${normalizedCwd}`);
           appendOutput(`[DIAGNOSTIC] Tauri Shell Plugin: Loaded`);
-          appendOutput(`[DIAGNOSTIC] Shell Fallback: Direct -> PowerShell -> CMD`);
+          appendOutput(`[DIAGNOSTIC] Shell Engine: PowerShell (VSCode-compatible)`);
+          return;
+        }
+        if (val.trim() === 'pwd') {
+          appendOutput(normalizedCwd);
           return;
         }
 
-        if (val.trim() === 'aura env' || val.trim() === 'env') {
-          appendOutput(`[ENV] PATH: ${typeof process !== 'undefined' ? process.env?.PATH : 'Browser/Restricted'}`);
+        // --- Handle 'cd' command to change working directory ---
+        if (val.trim().startsWith('cd ')) {
+          const target = val.trim().substring(3).trim().replace(/"/g, '').replace(/'/g, '');
+          let newPath = '';
+          if (target === '..') {
+            const parts = normalizedCwd.split('\\');
+            parts.pop();
+            newPath = parts.join('\\') || 'C:\\';
+          } else if (/^[a-zA-Z]:\\/.test(target) || /^[a-zA-Z]:\\\\/.test(target)) {
+            // Absolute path
+            newPath = target.replace(/\//g, '\\');
+          } else {
+            newPath = `${normalizedCwd}\\${target}`.replace(/\//g, '\\');
+          }
+          setNativeProjectPath(newPath.replace(/\\\\/g, '\\'));
+          appendOutput(`✓ Pindah ke: ${newPath}`);
           return;
         }
 
-        const parts = val.trim().split(/\s+/);
-        const mainCmd = parts[0];
-        const args = parts.slice(1);
-
-        // --- TRIPLE FALLBACK STRATEGY (V1.1.9) ---
+        // --- UNIVERSAL POWERSHELL EXECUTION (Like VSCode) ---
+        // VSCode runs ALL commands through a shell. We do the same with PowerShell.
+        // This guarantees that npm, git, node, python, etc. all work because
+        // PowerShell inherits the system PATH environment variable.
         let child;
-        let lastError: any = null;
-
-        // 1. Try direct command execution (e.g., npm.cmd for Windows)
         try {
-          // On Windows, 'npm' usually needs to be 'npm.cmd' if not using a shell
-          const binary = (mainCmd === 'npm' || mainCmd === 'git') ? `${mainCmd}.cmd` : mainCmd;
-          child = await TauriCommand.create(binary, args, { cwd: normalizedCwd }).spawn();
-        } catch (e: any) {
-          lastError = e;
-          // 2. Try powershell fallback (Inherit env better)
+          child = await TauriCommand.create(
+            'powershell',
+            ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', val],
+            { cwd: normalizedCwd }
+          ).spawn();
+        } catch (psErr: any) {
+          // Fallback to cmd.exe if PowerShell fails
           try {
             child = await TauriCommand.create(
-              'powershell',
-              ['-NoProfile', '-NonInteractive', '-Command', val],
+              'cmd',
+              ['/C', val],
               { cwd: normalizedCwd }
             ).spawn();
-          } catch (e2: any) {
-            lastError = e2;
-            // 3. Try cmd.exe fallback (Absolute fallback)
-            try {
-              child = await TauriCommand.create(
-                'cmd',
-                ['/C', val],
-                { cwd: normalizedCwd }
-              ).spawn();
-            } catch (e3: any) {
-              lastError = e3;
-              // Final Error with STRINGIFIED data for root cause analysis
-              const errorData = JSON.stringify(e3, Object.getOwnPropertyNames(e3));
-              throw new Error(`Semua metode gagal. Data: ${errorData}`);
-            }
+          } catch (cmdErr: any) {
+            const errorData = JSON.stringify(cmdErr, Object.getOwnPropertyNames(cmdErr));
+            throw new Error(`Shell tidak tersedia. Detail: ${errorData}`);
           }
         }
 
-        if (!child) throw new Error("Gagal menginisialisasi proses child.");
+        if (!child) throw new Error("Gagal menginisialisasi shell process.");
 
         activeProcessRef.current = child;
 
@@ -1419,35 +1424,31 @@ Integrations:
         });
 
         child.stderr.on('data', (line: string) => {
-          if (line) appendOutput(`[ERR] ${line}`);
+          if (line) appendOutput(line);
         });
 
         child.on('close', (data: { code: number | null }) => {
           activeProcessRef.current = null;
-          if (data?.code === 0) {
-            appendOutput(`✓ Selesai`);
-          } else if (data?.code !== null) {
-            appendOutput(`✗ Selesai (Exit Code: ${data.code})`);
+          if (data?.code !== 0 && data?.code !== null) {
+            appendOutput(`Process exited with code ${data.code}`);
           }
         });
 
         return; 
       } catch (err: any) {
         console.error('Tauri Shell Error:', err);
-        appendOutput(`[SYSTEM ERROR] ${err?.message || 'Gagal menjalankan perintah.'}`);
-        appendOutput(`[TRACE] CWD: ${nativeProjectPath}`);
-        appendOutput(`[TRACE] CMD: ${val}`);
+        appendOutput(`[ERROR] ${err?.message || 'Gagal menjalankan perintah.'}`);
         activeProcessRef.current = null;
       }
     } else {
       // Fallback Simulator (only if not in native mode or no folder open)
       const cmd = val.toLowerCase();
-      if (cmd === 'clear') {
+      if (cmd === 'clear' || cmd === 'cls') {
         setTerminalSessions(prev => prev.map(s => s.id === sessionId ? { ...s, output: [] } : s));
-      } else if (cmd === 'ls') {
+      } else if (cmd === 'ls' || cmd === 'dir') {
         appendOutput(files.map(f => f.name).join('  '));
       } else if (cmd === 'help') {
-        appendOutput('Available: clear, ls, help, scan, build, date, aura --version, whoami, neofetch, git status, npm install, npm run dev');
+        appendOutput('Available: clear, ls, help, scan, build, date, aura --version, whoami, neofetch');
       } else if (cmd === 'scan') {
         scanForProblems();
       } else if (cmd === 'date') {
@@ -1457,23 +1458,20 @@ Integrations:
         appendOutput('> tsc && vite build');
         appendOutput('✓ built in 1.23s');
       } else if (cmd === 'aura --version') {
-        appendOutput('Aura IDE v4.0.0 (Cursor Evolution)');
+        appendOutput('Aura IDE v5.0.0 (VSCode Terminal Engine)');
       } else if (cmd === 'whoami') {
         appendOutput('aura-developer');
-      } else if (cmd === 'neofetch') {
-        appendOutput('      .---.      OS: Windows 11 / AuraOS 4.0.0');
-        appendOutput('     /     \\     Host: Aura Native Desktop');
-        appendOutput('    | () () |    Kernel: Native Bridge');
-        appendOutput('      |||||      Shell: PowerShell (Dual-Path)');
-      } else if (cmd.startsWith('git') || cmd.startsWith('npm')) {
+      } else if (cmd === 'pwd') {
+        appendOutput(nativeProjectPath || '/aura-project');
+      } else if (cmd.startsWith('git') || cmd.startsWith('npm') || cmd.startsWith('node')) {
         if (isTauri && !nativeProjectPath) {
-          appendOutput(`[AURA INFO] Perintah "${cmd.split(' ')[0]}" memerlukan folder proyek yang dibuka secara Native.`);
-          appendOutput(`[ACTION] Klik ikon 'Folder dengan Kilat' (FolderTree) di toolbar Explorer.`);
+          appendOutput(`[INFO] Perintah "${cmd.split(' ')[0]}" memerlukan folder proyek Native.`);
+          appendOutput(`[ACTION] Buka folder Native terlebih dahulu melalui Explorer > ikon ⚡.`);
         } else if (!isTauri) {
-          appendOutput('[SIMULATOR] Fitur Terminal Native (NPM/Git/Build) hanya tersedia di aplikasi Desktop (.exe).');
+          appendOutput('[INFO] Terminal Native (NPM/Git/Node) hanya tersedia di aplikasi Desktop (.exe).');
         }
       } else {
-        appendOutput(`Command not found: ${val}`);
+        appendOutput(`Command not found: ${val}. Ketik 'help' untuk daftar perintah.`);
       }
     }
   };
