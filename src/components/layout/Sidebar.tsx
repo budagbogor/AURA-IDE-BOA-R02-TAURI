@@ -843,9 +843,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <p className="text-[10px] text-gray-500">Quick toggle between modes</p>
                       </div>
                       <div className="flex gap-1.5">
-                        <button onClick={() => relayout('default')} className="px-2 py-1 bg-[#3c3c3c] rounded-lg text-[9px] hover:bg-blue-600 transition-colors">Classic</button>
-                        <button onClick={() => relayout('modern')} className="px-2 py-1 bg-[#3c3c3c] rounded-lg text-[9px] hover:bg-blue-600 transition-colors">Modern</button>
-                        <button onClick={() => relayout('zen')} className="px-2 py-1 bg-[#3c3c3c] rounded-lg text-[9px] hover:bg-blue-600 transition-colors">Zen</button>
+                        <button onClick={() => relayout('default')} className="px-3 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all">DEFAULT LOOK</button>
+                        <button onClick={() => relayout('zen')} className="px-3 py-1.5 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-lg text-[10px] font-bold hover:bg-purple-600 hover:text-white transition-all">ZEN ONLY</button>
                       </div>
                     </div>
                   </div>

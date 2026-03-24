@@ -312,7 +312,7 @@ export default function App() {
   }, [showAiPanel]);
 
   const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([
-    { id: 'default', name: 'Terminal', output: ['Aura Terminal v4.0.0 (Cursor Core)', 'Ready for input...'] }
+    { id: 'default', name: 'Terminal', output: ['\u001b[36m⚡ AURA TERMINAL ENGINE V5.0.0\u001b[0m', 'Ready for intelligent development...', ''] }
   ]);
   const [activeTerminalId, setActiveTerminalId] = useState('default');
   
@@ -798,14 +798,21 @@ export default function App() {
     if (preset === 'default') {
       setLayoutMode('classic');
       setZenMode(false);
+      setShowAiPanel(true);
+      setShowBottomPanel(true);
+      setSidebarTab('files');
       setShowBrowser(false);
     } else if (preset === 'zen') {
       setZenMode(true);
+      setShowAiPanel(false);
+      setShowBottomPanel(false);
+      setShowBrowser(false);
     } else if (preset === 'modern') {
       setLayoutMode('modern');
       setZenMode(false);
     }
-    appendTerminalOutput(`Layout switched to ${preset} mode.`);
+    const displayPreset = preset === 'default' ? 'DEFAULT LOOK' : preset === 'zen' ? 'ZEN ONLY' : 'MODERN';
+    appendTerminalOutput(`[SYSTEM] Layout switched to ${displayPreset} mode.`);
   };
 
   const scanForProblems = async () => {
