@@ -24,8 +24,8 @@
 ## 3. Teknologi yang Digunakan
 - **Frontend / UI:** React 19, TypeScript, Vite, Tailwind CSS 4, Framer Motion.
 - **Editor Engine:** Monaco Editor.
-- **Backend Frame:** Tauri v2 (Rust-based) dan Electron (sebagai *fallback* atau fitur spesifik jika diperlukan).
-- **Integrasi Pihak Ketiga:** GitHub API, Supabase untuk *Cloud Project Storage*, Model Context Protocol (MCP).
+- **Backend Frame:** Tauri v2 (Rust-based) — Ringan, aman, dan performa native tinggi.
+- **Integrasi Pihak Ketiga:** GitHub API, Model Context Protocol (MCP).
 
 ## 4. Kriteria Keberhasilan (Success Metrics)
 1. Terminal di prompt chat dapat digunakan 100% untuk mengeksekusi *command* build dan dev.

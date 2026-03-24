@@ -21,7 +21,7 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
               <Bot size={28} className="text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">AURA AI IDE v4.0.0</h2>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">AURA AI IDE v5.6.0</h2>
               <p className="text-[#858585] text-sm mt-1">The Next Generation AI-Powered Development Environment</p>
             </div>
           </div>
@@ -45,7 +45,7 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     <div className="mt-1"><Bot size={16} className="text-emerald-400" /></div>
                     <div>
                       <h4 className="text-sm font-medium text-white mb-1">Multi-AI Architecture</h4>
-                      <p className="text-xs text-[#858585] leading-relaxed">Pilih antara Gemini 2.0 Flash, OpenRouter (Claude/GPT-4), Bytez, atau SumoPod. Bebas beralih model kapan saja.</p>
+                      <p className="text-xs text-[#858585] leading-relaxed">Fokus pada Gemini 2.0 Flash sebagai model utama, dengan dukungan fallback otomatis ke OpenRouter, Bytez, dan SumoPod.</p>
                     </div>
                   </div>
                   <div className="flex gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
@@ -93,10 +93,10 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     </div>
                   </div>
                   <div className="flex gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
-                    <div className="mt-1"><Cloudy size={16} className="text-emerald-400" /></div>
+                    <div className="mt-1"><Cloudy size={16} className="text-blue-400" /></div>
                     <div>
-                      <h4 className="text-sm font-medium text-white mb-1">Supabase Cloud Sync</h4>
-                      <p className="text-xs text-[#858585] leading-relaxed">Simpan keseluruhan proyek sementara di Cloud (Supabase) dengan satu klik. Lanjutkan coding dimana saja.</p>
+                      <h4 className="text-sm font-medium text-white mb-1">Local-First Desktop Power</h4>
+                      <p className="text-xs text-[#858585] leading-relaxed">Sinkronisasi native ke disk lokal via Tauri FS secara otonom. Tanpa ketergantungan cloud, lebih cepat dan aman.</p>
                     </div>
                   </div>
                   <div className="flex gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">

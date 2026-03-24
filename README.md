@@ -11,7 +11,7 @@
 
 **Aura AI IDE** adalah lingkungan pengembangan terpadu (IDE) modern yang dirancang untuk pengembang masa depan. Menggabungkan estetika premium bergaya *glassmorphism* dengan integrasi AI yang mendalam, Aura memungkinkan Anda membangun aplikasi web dan desktop dalam satu alur kerja yang sangat mulus.
 
-IDE ini bukan sekadar editor kode — ini adalah **ekosistem pengembangan lengkap** dengan terminal native, sinkronisasi GitHub real-time, penyimpanan cloud Supabase, dan sistem rilis otomatis (CI/CD) mandiri.
+IDE ini bukan sekadar editor kode — ini adalah **ekosistem pengembangan lengkap** dengan terminal native, sinkronisasi GitHub real-time, dan sistem rilis otomatis (CI/CD) mandiri.
 
 ---
 
@@ -32,14 +32,11 @@ IDE ini bukan sekadar editor kode — ini adalah **ekosistem pengembangan lengka
 
 ### 🖥️ Mode Desktop (Windows Installer)
 - **Native Terminal:** Eksekusi perintah asli (`npm`, `git`, `node`, `powershell`) langsung dari IDE.
-- **Native Folder Sync:** Buka folder lokal dan sinkronkan seluruh isi file ke editor secara rekursif.
-- **Direct Disk-Save (Ctrl+S):** Simpan file langsung ke hard drive Anda, bukan hanya ke memori browser.
-- **Custom App Icon:** Logo Aura IDE ditampilkan di taskbar, desktop shortcut, dan Start Menu Windows.
+- **Backend Frame:** Tauri v2 (Rust-based) — Ringan, aman, dan performa native tinggi.
 
 ### 🔗 Integrasi Mendalam
-- **GitHub Native:** Clone repository, commit, dan push langsung dari sidebar tanpa terminal.
-- **Supabase Cloud:** Simpan dan muat proyek dari database cloud Supabase (termasuk default database bawaan).
-- **MCP Protocol:** Dukungan Model Context Protocol untuk koneksi ke server MCP pihak ketiga.
+- **Integrasi Pihak Ketiga:** GitHub API, Model Context Protocol (MCP).
+untuk koneksi ke server MCP pihak ketiga.
 - **Internal Browser:** Preview proyek HTML/CSS/JS langsung di dalam IDE dengan split view.
 
 ### 💎 Premium User Experience

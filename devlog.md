@@ -18,11 +18,15 @@ Log rekam jejak historis pengembangan fitur pada AURA AI IDE.
   - **Global UX**: Scrollbar yang lebih halus, transisi animasi Framer Motion, dan tipografi JetBrains Mono.
   - **Version**: AURA AI IDE v5.4.0 (Stable Release).
 
+## [2026-03-24] - System Lean Optimization (v5.6.0)
+- **Supabase Deprecation**: Menghapus seluruh integrasi Supabase (Service, State, UI) untuk performa lokal yang lebih ringan.
+- **Tauri Native Focus**: Menghapus dependensi Electron fallback; aplikasi kini 100% Tauri Native.
+- **Layout Intelligence**: Implementasi mode "DEFAULT LOOK" dan "ZEN ONLY" di tab Settings.
+- **Keyboard Shortcuts**: Menambahkan `Ctrl+B` (Sidebar) dan `Ctrl+`` (Terminal) ke kernel sistem.
+- **Documentation**: Sinkronisasi seluruh dokumen (PRD, DevPlan, README, Guide) ke status v5.6.0 Stable.
+
 **Status Kendala Saat Ini:**
-- Kecepatan penulisan lambat dan tidak semua file pendukung otomatis dibuat.
-- Terminal di sisi Chat Prompt belum bekerja menghubungkan fungsi riil sistem seperti `npm run` atau build.
-- Browser internal (preview) terpisah dan belum otomatis merender hasil build server.
+- Tidak ada (System in Stable Lean State).
 
 **Langkah Selanjutnya:**
-- Memulai eksekusi skema dari Fase 1 DevPlan: Mengelola integrasi model OpenRouter (mencari titik *auto-switch* dan mendeteksi kondisi load CPU/trafik model gratis).
-- Persiapan akses Shell di Tauri untuk Terminal Cerdas AI.
+- Pemeliharaan rutin dan monitoring performa pada proyek skala besar.

@@ -275,6 +275,12 @@ export default function App() {
       } else if (e.ctrlKey && e.key === 'F12') {
         e.preventDefault();
         setShowBrowser(prev => !prev);
+      } else if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        setSidebarWidth(prev => prev === 0 ? 300 : 0);
+      } else if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        setShowBottomPanel(prev => !prev);
       } else if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowFileSearch(false);
