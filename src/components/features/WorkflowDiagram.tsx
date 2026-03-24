@@ -38,7 +38,7 @@ export const WorkflowDiagram: React.FC = () => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="w-full max-w-5xl mx-auto mt-12 mb-8 px-6"
+      className="w-full max-w-5xl mx-auto mt-6 mb-8 px-6"
     >
       <div className="flex flex-col md:flex-row items-stretch justify-between gap-4 relative">
         
@@ -137,15 +137,6 @@ export const WorkflowDiagram: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3 group">
-              <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
-                <Box size={16} />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-[11px] font-semibold text-gray-200">Electron Build</span>
-                <span className="text-[9px] text-gray-500">Kompatibilitas luas</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 group">
               <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                 <Smartphone size={16} />
               </div>
@@ -154,6 +145,7 @@ export const WorkflowDiagram: React.FC = () => {
                 <span className="text-[9px] text-gray-500">Build via Capacitor</span>
               </div>
             </div>
+
             <div className="flex items-center gap-3 group">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
                 <Cloud size={16} />

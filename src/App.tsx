@@ -297,6 +297,21 @@ export default function App() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+
+  // --- Layout Coordination Fase 5 ---
+  // Pastikan panel AI tidak muncul duplikat di kiri dan kanan
+  useEffect(() => {
+    if (sidebarTab === 'ai' && showAiPanel) {
+      setShowAiPanel(false);
+    }
+  }, [sidebarTab]);
+
+  useEffect(() => {
+    if (showAiPanel && sidebarTab === 'ai') {
+      setSidebarTab('files');
+    }
+  }, [showAiPanel]);
+
   const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([
     { id: 'default', name: 'Terminal', output: ['Aura Terminal v4.0.0 (Cursor Core)', 'Ready for input...'] }
   ]);
@@ -1630,10 +1645,15 @@ Integrations:
         <div className="relative group cursor-pointer hover:text-white px-2 py-1.5">
           <span>View</span>
           <div className="absolute top-full left-0 mt-0 bg-[#252526] border border-white/10 rounded shadow-2xl py-1 hidden group-hover:block min-w-[240px]">
-            <div className="px-4 py-2 hover:bg-blue-600 hover:text-white cursor-pointer transition-colors flex justify-between items-center" onClick={() => setShowAiPanel(!showAiPanel)}>
+            <div className="px-4 py-2 hover:bg-blue-600 hover:text-white cursor-pointer transition-colors flex justify-between items-center" onClick={() => {
+              const newState = !showAiPanel;
+              setShowAiPanel(newState);
+              if (newState && sidebarTab === 'ai') setSidebarTab('files');
+            }}>
               <span>Aura AI Prompt (Kanan)</span>
               {showAiPanel && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
             </div>
+
             <div className="px-4 py-2 hover:bg-blue-600 hover:text-white cursor-pointer transition-colors flex justify-between items-center" onClick={() => setShowBottomPanel(!showBottomPanel)}>
               <span>Terminal & Output (Bawah)</span>
               {showBottomPanel && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}

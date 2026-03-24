@@ -61,13 +61,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     <div className="flex-1 flex min-h-0 relative">
       {/* Welcome Screen when no files are open */}
       {files.length === 0 && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1e1e1e] text-center p-6 space-y-6 overflow-y-auto">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1e1e1e] text-center p-6 space-y-4 overflow-y-auto">
           <div className="flex items-center justify-center animate-[pulse_3s_ease-in-out_infinite] drop-shadow-[0_0_20px_rgba(59,130,246,0.2)]">
             <AuraLogo size={70} className="drop-shadow-2xl" />
           </div>
-          <div className="space-y-1.5">
-            <h2 className="text-2xl font-bold text-white tracking-tight">Welcome to Aura IDE</h2>
-            <p className="text-[#858585] text-sm max-w-sm mx-auto">The next generation AI-powered development environment. Start by creating a new file or opening a folder.</p>
+          <div className="flex flex-col items-center gap-0.5">
+            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">Welcome to Aura IDE</h2>
+            <p className="text-[#858585] text-[clamp(0.7rem,1.5vw,0.85rem)] max-w-sm mx-auto line-clamp-2 leading-relaxed italic">
+              The next generation AI-powered development environment. Start by creating a new file or opening a folder.
+            </p>
           </div>
           <div className="flex flex-wrap justify-center gap-3 w-full max-w-4xl px-4">
             <button onClick={openFolder} className="flex flex-col items-center gap-1.5 p-3 bg-[#252526]/50 backdrop-blur-md hover:bg-[#2d2d2d] rounded-xl border border-white/5 transition-all group hover:scale-105 active:scale-95 w-32">
