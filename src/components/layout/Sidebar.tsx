@@ -7,7 +7,7 @@ import { AuraLogo } from '@/components/layout/AuraLogo';
 import { 
   FileCode, Search, Sparkles, GitBranch, Github, Globe, HelpCircle, 
   Settings, ChevronRight, X, RotateCcw, Monitor, Smartphone, Layout, 
-  Eye, FolderOpen, Download, Terminal, Plus, CloudUpload, CloudDownload,
+  Eye, FolderOpen, Download, Terminal, Plus,
   FolderTree, RefreshCw, Bot, User, ImageIcon, FileIcon, Paperclip, Send,
   Cpu, ExternalLink, CheckCircle, AlertTriangle, Play, ChevronDown, Database,
   ChevronRight as ChevronRightIcon
@@ -75,8 +75,6 @@ interface SidebarProps {
   autoPreview: (force?: boolean) => void;
   onAiSuccess?: (stats: { fileCount: number; commands: string[] }) => void;
   exportProject: () => void;
-  handleCloudSave: () => void;
-  handleCloudLoad: () => void;
   handleGithubPush: () => void;
   executeCommand: (cmd: string) => void;
   appendTerminalOutput: (msg: string | string[], sessionId?: string) => void;
@@ -115,12 +113,6 @@ interface SidebarProps {
   setSelectedSkill: (skill: string) => void;
   context7Mode: boolean;
   setContext7Mode: (mode: boolean) => void;
-  supabaseUrl: string;
-  setSupabaseUrl: (url: string) => void;
-  supabaseAnonKey: string;
-  setSupabaseAnonKey: (key: string) => void;
-  supabaseConnected: boolean;
-  setSupabaseConnected: (connected: boolean) => void;
   mcpServers: McpServer[];
   setMcpServers: React.Dispatch<React.SetStateAction<McpServer[]>>;
   selectedMcpTemplateIdx: number | 'custom';
@@ -139,7 +131,6 @@ interface SidebarProps {
   setShowMcpLogsFor: (name: string | null) => void;
   activeMcpLogs: string[];
   setActiveMcpLogs: (logs: string[]) => void;
-  testSupabase: () => Promise<void>;
   testingStatus: Record<string, 'idle' | 'loading' | 'success' | 'error'>;
   testAiConnection: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod') => Promise<void>;
   testGithubConnection: () => Promise<void>;
@@ -277,7 +268,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setShowBrowser, isTauri, TauriCommand, openFolderNative,
   createNewFile, openFolder, closeFolder, exportProject,
   autoPreview, onAiSuccess,
-  handleCloudSave, handleCloudLoad, handleGithubPush, executeCommand,
+  handleGithubPush, executeCommand,
   appendTerminalOutput, handleContextMenu,
 
   relayout, setLayoutMode, setZenMode, aiProvider, setAiProvider,
@@ -288,15 +279,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   dynamicFreeModels, isFetchingModels, refreshModels,
   systemInstruction, setSystemInstruction, aiRules, setAiRules,
   selectedSkill, setSelectedSkill, context7Mode, setContext7Mode,
-  supabaseUrl, setSupabaseUrl, supabaseAnonKey, setSupabaseAnonKey,
-  supabaseConnected, setSupabaseConnected,
   resetAllConnections,
   mcpServers, setMcpServers,
   selectedMcpTemplateIdx, setSelectedMcpTemplateIdx, mcpTemplateData, setMcpTemplateData,
   newMcpName, setNewMcpName, newMcpType, setNewMcpType,
   newMcpUrl, setNewMcpUrl, newMcpEnvStr, setNewMcpEnvStr,
   showMcpLogsFor, setShowMcpLogsFor, activeMcpLogs, setActiveMcpLogs,
-  testSupabase, testingStatus, testAiConnection,
+  testingStatus, testAiConnection,
   testGithubConnection, testError,
   nativeProjectPath
 }) => {
@@ -483,17 +472,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 
                 <div className="w-[1px] h-3.5 bg-white/10 my-auto mx-0.5" />
                 
-                <button onClick={handleGithubPush} title="Push Project to GitHub" className="hover:text-[#adbac7] transition-colors relative group">
-                  <Github size={14} />
-                  <div className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                </button>
-                <button onClick={handleCloudSave} title="Save to Supabase Cloud" className="hover:text-emerald-400 transition-colors">
-                  <CloudUpload size={14} />
-                </button>
-                <button onClick={handleCloudLoad} title="Load from Supabase Cloud" className="hover:text-blue-400 transition-colors">
-                  <CloudDownload size={14} />
-                </button>
-
                 <div className="w-[1px] h-3.5 bg-white/10 my-auto mx-0.5" />
                 
                 <button onClick={() => autoPreview()} title="Live Preview Auto" className="hover:text-green-400 transition-colors">
@@ -801,49 +779,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="flex flex-col p-4 gap-6 overflow-y-auto custom-scrollbar"
               >
-                {/* Supabase Status Card */}
-                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold italic">S</div>
-                      <div>
-                        <h4 className="text-[12px] font-extrabold text-white tracking-tight">Supabase Cloud</h4>
-                        <p className="text-[9px] text-gray-500 uppercase tracking-widest leading-none mt-0.5">Data Persistence</p>
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1",
-                      supabaseConnected ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                    )}>
-                      <div className={cn("w-1.5 h-1.5 rounded-full", supabaseConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500")} />
-                      {supabaseConnected ? 'ONLINE' : 'OFFLINE'}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase px-1">Active Project URL</p>
-                      <div className="p-2 bg-black/20 rounded-lg border border-white/5 text-[10px] text-gray-400 font-mono truncate">
-                        {supabaseUrl || 'https://ngbzuagtzlepqutnkfeo...'}
-                      </div>
-                    </div>
-
-                    <ConnectionStatus 
-                      status={testingStatus.supabase || 'idle'} 
-                      error={testError.supabase}
-                      onTest={testSupabase}
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={handleCloudSave} className="p-2 bg-white/5 rounded-lg text-[10px] hover:bg-white/10 text-gray-300 flex items-center justify-center gap-1.5">
-                        <CloudUpload size={12} className="text-emerald-400" /> Save
-                      </button>
-                      <button onClick={handleCloudLoad} className="p-2 bg-white/5 rounded-lg text-[10px] hover:bg-white/10 text-gray-300 flex items-center justify-center gap-1.5">
-                        <CloudDownload size={12} className="text-blue-400" /> Load
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
                 {/* MCP Database Tools */}
                 <div className="space-y-4">
@@ -1033,35 +968,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       />
                     </div>
 
-                    {/* Supabase Config */}
-                    <div className="p-4 bg-black/20 rounded-2xl border border-white/5 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 text-[10px] font-bold italic">S</div>
-                        <span className="text-[12px] font-bold">Supabase Cloud Sync</span>
-                      </div>
-                      <div className="space-y-2">
-                        <input 
-                          type="text" 
-                          placeholder="Supabase Project URL..."
-                          value={supabaseUrl}
-                          onChange={(e) => setSupabaseUrl(e.target.value)}
-                          className="w-full bg-[#3c3c3c] border border-white/10 rounded-lg px-3 py-2 text-[11px] outline-none"
-                        />
-                        <input 
-                          type="password" 
-                          placeholder="Anon / Service Role Key..."
-                          value={supabaseAnonKey}
-                          onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                          className="w-full bg-[#3c3c3c] border border-white/10 rounded-lg px-3 py-2 text-[11px] outline-none"
-                        />
-                      </div>
-                      <ConnectionStatus 
-                        status={testingStatus.supabase || 'idle'} 
-                        error={testError.supabase}
-                        onTest={testSupabase}
-                        label="Test Database Connection"
-                      />
-                    </div>
+
 
                     {/* Reset Connections Button */}
                     <div className="pt-2">

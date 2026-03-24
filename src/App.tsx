@@ -78,7 +78,6 @@ import {
 import { getGeminiAI, generateGeminiStream } from './services/geminiService';
 import { generateOpenRouterContent, fetchFreeModels, type OpenRouterModel } from './services/openRouterService';
 import { generateBytezContent } from './services/bytezService';
-import { saveProjectToCloud, loadProjectFromCloud, listCloudProjects, testSupabaseConnection } from './services/supabaseService';
 import { fetchUserRepos, cloneRepository, pushProjectToGitHub, fetchUserProfile } from './services/githubService';
 import { generateSumopodContent } from './services/sumopodService';
 import JSZip from 'jszip';
@@ -500,36 +499,6 @@ export default function App() {
     appendTerminalOutput('Folder closed.');
   };
 
-  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('aura_supabase_url') || '');
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState(() => localStorage.getItem('aura_supabase_key') || '');
-  const [supabaseConnected, setSupabaseConnected] = useState(() => localStorage.getItem('aura_supabase_connected') === 'true');
-  const [isSupabaseTesting, setIsSupabaseTesting] = useState(false);
-
-  const testSupabase = async () => {
-    const activeUrl = supabaseUrl || DEFAULT_SUPABASE_URL;
-    const activeKey = supabaseAnonKey || DEFAULT_SUPABASE_KEY;
-    
-    if (!activeUrl || !activeKey) return;
-    
-    setTestingStatus(prev => ({ ...prev, supabase: 'loading' }));
-    appendTerminalOutput(`[CLOUD] Mencoba menghubungkan ke Supabase: ${activeUrl}...`);
-    try {
-      const success = await testSupabaseConnection({ url: activeUrl, anonKey: activeKey });
-      if (success) {
-        setSupabaseConnected(true);
-        localStorage.setItem('aura_supabase_connected', 'true');
-        setTestingStatus(prev => ({ ...prev, supabase: 'success' }));
-        appendTerminalOutput('✓ Berhasil terhubung ke Supabase Cloud!');
-      }
-    } catch (err: any) {
-      setSupabaseConnected(false);
-      localStorage.setItem('aura_supabase_connected', 'false');
-      setTestingStatus(prev => ({ ...prev, supabase: 'error' }));
-      setTestError(prev => ({ ...prev, supabase: err.message }));
-      appendTerminalOutput(`✗ Gagal terhubung: ${err.message}`);
-    }
-  };
-
   const testGithubConnection = async () => {
     if (!githubToken) return;
     setTestingStatus(prev => ({ ...prev, github: 'loading' }));
@@ -591,9 +560,6 @@ export default function App() {
     setGithubToken('');
     setGithubConnected(false);
     setGithubUser(null);
-    setSupabaseUrl('');
-    setSupabaseAnonKey('');
-    setSupabaseConnected(false);
     setTestingStatus({});
     setTestError({});
 
@@ -803,10 +769,7 @@ export default function App() {
     }
   }, [githubToken]);
 
-  useEffect(() => {
-    localStorage.setItem('aura_supabase_url', supabaseUrl);
-    localStorage.setItem('aura_supabase_key', supabaseAnonKey);
-  }, [supabaseUrl, supabaseAnonKey]);
+
 
   useEffect(() => {
     localStorage.setItem('aura_mcp_servers', JSON.stringify(mcpServers));
@@ -984,7 +947,6 @@ ${allFilesContext}
 Active File: ${activeFile?.name || 'None'}
 Integrations:
 - GitHub: ${githubConnected ? 'Connected' : 'Disconnected'}
-- Supabase: ${supabaseConnected ? 'Connected' : 'Disconnected'}
 - MCP Servers: ${mcpServers.filter(s => s.connected).map(s => s.name).join(', ') || 'None'}
 `;
       }
@@ -1378,70 +1340,7 @@ Integrations:
     appendTerminalOutput('Project exported as aura-project.zip');
   };
 
-  const DEFAULT_SUPABASE_URL = 'https://ngbzuagtzlepqutnkfeo.supabase.co';
-  const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nYnp1YWd0emxlcHF1dG5rZmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NzgzOTcsImV4cCI6MjA4OTU1NDM5N30.x5hacVx08FJboVxTIPJaXIOF9XG2axc8AzF7qmQV1DM';
 
-  const handleCloudSave = async () => {
-    const activeUrl = supabaseUrl || DEFAULT_SUPABASE_URL;
-    const activeKey = supabaseAnonKey || DEFAULT_SUPABASE_KEY;
-    
-    if (!activeUrl || !activeKey) {
-      alert("Kredensial Cloud belum dikonfigurasi.");
-      return;
-    }
-    const name = prompt("Simpan ke Supabase Cloud dengan Nama Project:", projectName);
-    if (!name) return;
-    
-    appendTerminalOutput(`[CLOUD] Mengekspor ${files.length} file ke Supabase...`);
-    try {
-      await saveProjectToCloud({ url: activeUrl, anonKey: activeKey }, name, files);
-      setProjectName(name);
-      appendTerminalOutput(`[CLOUD] Project '${name}' berhasil disimpan menggunakan ${supabaseUrl ? 'Database Custom (Pengguna)' : 'Database Default Aura'}!`);
-      alert("Berhasil disimpan ke Cloud!");
-    } catch (err: any) {
-      console.error(err);
-      appendTerminalOutput(`[CLOUD ERROR] ${err.message}`);
-      alert("Gagal menyimpan ke Cloud. Lihat output terminal untuk detailnya.");
-    }
-  };
-
-  const handleCloudLoad = async () => {
-    const activeUrl = supabaseUrl || DEFAULT_SUPABASE_URL;
-    const activeKey = supabaseAnonKey || DEFAULT_SUPABASE_KEY;
-
-    if (!activeUrl || !activeKey) {
-      alert("Kredensial Cloud belum dikonfigurasi.");
-      return;
-    }
-    try {
-      appendTerminalOutput(`[CLOUD] Mengambil daftar proyek dari ${supabaseUrl ? 'Database Custom' : 'Database Default'}...`);
-      const list = await listCloudProjects({ url: activeUrl, anonKey: activeKey });
-      
-      if (!list || list.length === 0) {
-        alert("Belum ada project yang tersimpan di Cloud.");
-        return;
-      }
-      
-      const names = list.map((l: any) => l.project_name).join("\n- ");
-      const name = prompt(`Pilih nama project untuk dimuat:\n\n- ${names}\n\n(Ketik nama project persis seperti di atas)`);
-      
-      if (!name) return;
-      
-      appendTerminalOutput(`[CLOUD] Mengunduh project '${name}'...`);
-      const project = await loadProjectFromCloud({ url: activeUrl, anonKey: activeKey }, name);
-      
-      if (project && project.files) {
-        setFiles(project.files);
-        if (project.files.length > 0) setActiveFileId(project.files[0].id);
-        setProjectName(project.project_name);
-        appendTerminalOutput(`[CLOUD] Project '${project.project_name}' berhasil dimuat dengan ${project.files.length} file!`);
-      }
-    } catch (err: any) {
-      console.error(err);
-      appendTerminalOutput(`[CLOUD ERROR] ${err.message}`);
-      alert(`Gagal memuat dari Cloud: ${err.message}`);
-    }
-  };
 
   const handleGithubPush = async () => {
     if (!githubToken) {
@@ -2006,8 +1905,6 @@ Integrations:
         autoPreview={handleAutoPreview}
         onAiSuccess={handleAiSuccess}
         exportProject={exportProject}
-        handleCloudSave={handleCloudSave}
-        handleCloudLoad={handleCloudLoad}
         handleGithubPush={handleGithubPush}
         executeCommand={executeCommand}
         appendTerminalOutput={appendTerminalOutput}
@@ -2044,12 +1941,6 @@ Integrations:
         setSelectedSkill={setSelectedSkill}
         context7Mode={context7Mode}
         setContext7Mode={setContext7Mode}
-        supabaseUrl={supabaseUrl}
-        setSupabaseUrl={setSupabaseUrl}
-        supabaseAnonKey={supabaseAnonKey}
-        setSupabaseAnonKey={setSupabaseAnonKey}
-        supabaseConnected={supabaseConnected}
-        setSupabaseConnected={setSupabaseConnected}
         resetAllConnections={resetAllConnections}
         mcpServers={mcpServers}
         setMcpServers={setMcpServers}
@@ -2069,7 +1960,7 @@ Integrations:
         setShowMcpLogsFor={setShowMcpLogsFor}
         activeMcpLogs={activeMcpLogs}
         setActiveMcpLogs={setActiveMcpLogs}
-        testSupabase={testSupabase}
+
         testingStatus={testingStatus}
         testAiConnection={testAiConnection}
         testGithubConnection={testGithubConnection}
