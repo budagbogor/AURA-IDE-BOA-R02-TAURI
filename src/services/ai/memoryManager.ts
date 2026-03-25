@@ -1,4 +1,4 @@
-import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/api/fs';
+import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
 
 export interface ProjectMemory {
   projectDescription: string;
