@@ -1451,29 +1451,30 @@ Integrations:
 
         try {
           if (isTauri && window.navigator.platform.includes('Win')) {
-            // Windows Robust Strategy:
-            // 1. Always ensure PowerShell is used with Bypass execution policy (many npm commands are scripts)
-            // 2. Use NoProfile to avoid long delays or custom prompt errors
-            // 3. Chain with CMD if PowerShell itself fails (fallback)
+            // Windows Triple-Layer Robust Strategy:
+            // 1. If it's a simple 'npm' command, try running it directly first (fastest, most reliable for path)
+            // 2. Fallback to 'cmd /S /C' with explicit quoting (most compatible for all Windows versions)
+            // 3. Last resort: PowerShell with ExecutionPolicy Bypass
             
-            if (isNpm) {
-               appendOutput(`[SYSTEM] Menggunakan Shell Optimasi: PowerShell (npm detected)`);
-               cmdInstance = TauriCommand.create(
-                 'powershell.exe', 
-                 ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `& { ${trimmedVal} }`], 
-                 { cwd: normalizedCwd }
-               );
+            const [prog, ...args] = trimmedVal.split(' ');
+            
+            if (isNpm && trimmedVal.split(' ').length <= 3) {
+               // Simple npm command (e.g. 'npm install', 'npm -v')
+               appendOutput(`[SYSTEM] Mencoba eksekusi langsung: ${trimmedVal}`);
+               cmdInstance = TauriCommand.create('npm', args, { cwd: normalizedCwd });
             } else {
-               appendOutput(`[SYSTEM] Menggunakan Shell Optimasi: CMD`);
-               cmdInstance = TauriCommand.create('cmd', ['/C', trimmedVal], { cwd: normalizedCwd });
+               // Complex command or non-npm
+               appendOutput(`[SYSTEM] Menggunakan Shell Optimasi: CMD /S /C`);
+               // NOTE: /S /C with quotes is the industry standard for robust CMD execution
+               cmdInstance = TauriCommand.create('cmd', ['/S', '/C', `"${trimmedVal}"`], { cwd: normalizedCwd });
             }
           } else {
             // Posix or other
             cmdInstance = TauriCommand.create('powershell', ['-NoLogo', '-NoProfile', '-Command', trimmedVal], { cwd: normalizedCwd });
           }
         } catch (err: any) {
-          appendOutput(`[SYSTEM] Inisialisasi shell gagal: ${err?.message}. Menggunakan fallback CMD...`);
-          cmdInstance = TauriCommand.create('cmd', ['/C', trimmedVal], { cwd: normalizedCwd });
+          appendOutput(`[SYSTEM] Eksekusi primer gagal: ${err?.message}. Mencoba fallback PowerShell...`);
+          cmdInstance = TauriCommand.create('powershell', ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', trimmedVal], { cwd: normalizedCwd });
         }
 
         if (!cmdInstance) throw new Error("Gagal menginisialisasi Command instance.");
@@ -1481,33 +1482,28 @@ Integrations:
         let stdoutBuffer = '';
         let stderrBuffer = '';
 
+        const handleData = (data: string, isError = false) => {
+          if (!data) return;
+          appendOutput(data);
+          if (isError) stderrBuffer += data + '\n';
+          else stdoutBuffer += data + '\n';
+
+          // --- DYNAMIC URL DETECTION (Fase 3 - Enhanced) ---
+          const urlRegex = /(https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.1|0\.0\.0\.0|\[::\]):\d+)/i;
+          const match = data.match(urlRegex);
+          if (match && match[0]) {
+             const detectedUrl = match[0].replace(/0\.0\.0\.0|\[::\]|0\.0\.0\.1/, 'localhost');
+             appendTerminalOutput(`[AURA BROWSER] 🚀 Server Aktif: ${detectedUrl}`);
+             setBrowserUrl(detectedUrl);
+             setBrowserSrcDoc(null);
+             setShowBrowser(true);
+             setSidebarTab('browser');
+          }
+        };
+
         // Attach listeners to the command instance BEFORE spawning (v2 API)
-        cmdInstance.on('stdout', (data: string) => {
-          if (data) {
-             appendOutput(data);
-             stdoutBuffer += data + '\n';
-
-             // --- DYNAMIC URL DETECTION (Fase 3) ---
-             // Mencari pola http://localhost:xxxx atau http://127.0.0.1:xxxx
-             const urlRegex = /(https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::\]):\d+)/i;
-             const match = data.match(urlRegex);
-             if (match && match[0]) {
-               const detectedUrl = match[0].replace(/0\.0\.0\.0|\[::\]/, 'localhost');
-               appendTerminalOutput(`[AURA BROWSER] Terdeteksi Dev Server: ${detectedUrl}. Membuka Preview...`);
-               setBrowserUrl(detectedUrl);
-               setBrowserSrcDoc(null);
-               setShowBrowser(true);
-               setSidebarTab('browser');
-             }
-          }
-        });
-
-        cmdInstance.on('stderr', (data: string) => {
-          if (data) {
-             appendOutput(data);
-             stderrBuffer += data + '\n';
-          }
-        });
+        cmdInstance.on('stdout', (data: string) => handleData(data));
+        cmdInstance.on('stderr', (data: string) => handleData(data, true));
 
         cmdInstance.on('close', (data: { code: number | null }) => {
           activeProcessRef.current = null;
@@ -1529,7 +1525,25 @@ Integrations:
                setAutoFixTrigger(c => c + 1);
             }
           } else {
-            appendOutput(`Process completed successfully.`);
+             // Successful exit - check if node_modules was expected but missing
+             if (trimmedVal.includes('npm install') || trimmedVal.includes('npm i')) {
+                // We use a small delay to let FS settle
+                setTimeout(async () => {
+                   try {
+                     // Check node_modules via shell as we are in the renderer
+                     const check = await TauriCommand.create('cmd', ['/C', 'if exist node_modules (echo YES) else (echo NO)'], { cwd: normalizedCwd }).execute();
+                     if (check.stdout.trim().includes('NO')) {
+                        appendOutput(`[SYSTEM] ⚠️ WARNING: 'npm install' selesai tapi 'node_modules' TIDAK ditemukan.`);
+                        appendOutput(`[SYSTEM] Hal ini biasanya terjadi jika Registry NPM lambat atau izin folder dibatasi.`);
+                        appendOutput(`[SYSTEM] Mencoba opsi darurat: npm install --no-bin-links...`);
+                        executeCommand('npm install --no-bin-links');
+                     } else {
+                        appendOutput(`[SYSTEM] ✅ Konfirmasi: node_modules berhasil dibuat.`);
+                     }
+                   } catch (e) {}
+                }, 1000);
+             }
+             appendOutput(`Process completed successfully.`);
           }
         });
 
