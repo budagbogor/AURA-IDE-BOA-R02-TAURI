@@ -274,9 +274,16 @@ export default function App() {
   const appendTerminalOutput = (data: string | string[], sessionId?: string) => {
     const targetId = sessionId || activeTerminalId;
     const lines = Array.isArray(data) ? data : [data];
+    
+    // 1. Update React State for historical persistence (tab switching, etc)
     setTerminalSessions(prev => prev.map(s => 
       s.id === targetId ? { ...s, output: [...s.output, ...lines] } : s
     ));
+
+    // 2. Direct-Write EventBus for real-time high-throughput rendering (bypasses React loop)
+    window.dispatchEvent(new CustomEvent('terminal-write', {
+      detail: { id: targetId, data: lines.join('\n') }
+    }));
   };
 
   const addTerminalSession = () => {

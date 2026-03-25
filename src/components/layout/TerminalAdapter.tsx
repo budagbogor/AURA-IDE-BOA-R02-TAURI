@@ -65,37 +65,51 @@ export const TerminalAdapter: React.FC<TerminalAdapterProps> = ({
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Handle user input in terminal
-    if (onData) {
-      term.onData(data => onData(data));
-    }
+    // Handle incoming terminal data directly via EventBus
+    const handleWrite = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.id === id) {
+        // Direct write bypasses React render cycle
+        term.write(customEvent.detail.data.replace(/\n/g, '\r\n') + '\r\n');
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('terminal-write', handleWrite);
 
-    // Initial output clear/fill
+    // Initial output clear/fill (only for historical data from state)
+    // Avoid double printing if it's already running. Usually historical data is just array of strings
     term.clear();
     output.forEach(line => {
-       // XTerm uses \r\n for new lines
        term.writeln(line.replace(/\n/g, '\r\n'));
     });
 
     // Cleanup
     return () => {
+      window.removeEventListener('terminal-write', handleWrite);
       term.dispose();
       xtermRef.current = null;
     };
-  }, [id]); // Re-init if session ID changes
+  }, [id]); // Re-init ONLY if session ID changes
 
-  // Update output when it changes
+  // Handle user input in terminal (we separate this to avoid re-binding)
   useEffect(() => {
-    if (xtermRef.current && output.length > 0) {
-      // Only write the LAST line to avoid flickering and performance issues
-      // Alternatively, we can clear and re-write, but that's expensive.
-      // For now, let's try writing the last line added.
-      const lastLine = output[output.length - 1];
-      if (lastLine) {
-        xtermRef.current.writeln(lastLine.replace(/\n/g, '\r\n'));
-      }
+    if (xtermRef.current && onData) {
+      const disposable = xtermRef.current.onData(data => onData(data));
+      return () => disposable.dispose();
     }
-  }, [output.length]);
+  }, [onData]);
+
+  // Handle resizing gracefully
+  useEffect(() => {
+    const handleResize = () => {
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <div 
