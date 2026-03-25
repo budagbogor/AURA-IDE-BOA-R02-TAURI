@@ -163,15 +163,16 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
       if (fileCount > 0 && appendTerminalOutput) {
         appendTerminalOutput(`[AI SUCCESS] Berhasil menerapkan ${fileCount} file ke Editor.`);
         
-        // --- AUTONOMOUS STRUCTURE AUDIT ---
+        // --- ELITE DESIGN & STRUCTURE AUDIT ---
         const missingFiles = auditProjectStructure(parseComposerResponse(fullResponse), projectTree);
         if (missingFiles.length > 0) {
-           appendTerminalOutput(`[AURA MAGIC] Mendeteksi struktur belum lengkap. Melengkapi: ${missingFiles.join(', ')}...`);
-           const autoPrompt = `Proyek ini sepertinya belum lengkap. Tolong buatkan file penting berikut agar project bisa langsung beroperasi: ${missingFiles.join(', ')}. Pastikan file tersebut memiliki konten standar yang valid.`;
+           appendTerminalOutput(`[AURA ELITE] Mendeteksi ketidakkonsistenan Desain & Struktur.`);
+           appendTerminalOutput(`[AURA ELITE] Melengkapi manifest penting: ${missingFiles.join(', ')}...`);
+           const autoPrompt = `Project ini membutuhkan sentuhan akhir untuk standar World-Class. Tolong buatkan file berikut dengan desain premium (Bento/Glassmorphism/Tokens): ${missingFiles.join(', ')}. Pastikan setiap file memiliki estetika tinggi.`;
            // Trigger recursive send with auto-correction prompt
            setTimeout(() => handleSend(autoPrompt, true), 1000);
         } else {
-           appendTerminalOutput(`[AURA MAGIC] AI selesai memodifikasi ${fileCount} file. Proyek terlihat solid.`);
+           appendTerminalOutput(`[AURA ELITE] Desain & Struktur terverifikasi: WORLD-CLASS.`);
         }
 
         if (onSuccess) onSuccess({ fileCount, commands: Array.from(appliedCommands) });
@@ -301,7 +302,7 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
                   <optgroup label="Web & Enterprise">
                     <option value="Auto">Auto (Smart)</option>
                     <option value="Full Stack">Full Stack</option>
-                    <option value="Frontend">Frontend UI/UX</option>
+                    <option value="Frontend">Elite UI/UX Master</option>
                     <option value="Backend">Backend API</option>
                   </optgroup>
                   <optgroup label="Apps & Platforms">

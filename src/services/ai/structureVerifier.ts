@@ -9,18 +9,18 @@ export interface ProjectBlueprint {
 export const PROJECT_BLUEPRINTS: ProjectBlueprint[] = [
   {
     name: 'Vite/React',
-    requiredFiles: ['package.json', 'index.html', 'src/main.tsx', 'vite.config.ts'],
-    description: 'Modern React project with Vite'
+    requiredFiles: ['package.json', 'index.html', 'src/main.tsx', 'vite.config.ts', 'src/styles/theme.css'],
+    description: 'Modern React project with Elite Design System'
   },
   {
     name: 'Next.js',
-    requiredFiles: ['package.json', 'app/page.tsx', 'next.config.mjs'],
-    description: 'Next.js App Router project'
+    requiredFiles: ['package.json', 'app/page.tsx', 'next.config.mjs', 'app/globals.css'],
+    description: 'Next.js project with Premium Layout'
   },
   {
     name: 'Vanilla HTML',
-    requiredFiles: ['index.html'],
-    description: 'Simple website'
+    requiredFiles: ['index.html', 'styles.css'],
+    description: 'Bento-style Landing Page'
   },
   {
     name: 'Capacitor Mobile',
