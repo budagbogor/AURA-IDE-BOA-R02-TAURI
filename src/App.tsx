@@ -436,11 +436,40 @@ export default function App() {
     }
   };
 
-  const closeFolder = () => {
+  const closeFolder = async () => {
+    // 1. Kill active terminal process
+    if (activeProcessRef.current) {
+      try { await activeProcessRef.current.kill(); } catch (e) {}
+      activeProcessRef.current = null;
+    }
+
+    // 2. Clear File Explorer
     setFiles([]);
     setActiveFileId('');
     setProjectName('AURA-PROJECT');
-    appendTerminalOutput('Folder closed.');
+    setNativeProjectPath(null);
+
+    // 3. Clear AI Panels (Restart Chat)
+    setChatMessages([
+      { role: 'assistant', content: 'Welcome to **Aura AI IDE**. I am your coding assistant. How can I help you today?' }
+    ]);
+    setComposerMessages([
+      { role: 'assistant', content: 'Assalamualaikum...' }
+    ]);
+    setAttachedFiles([]);
+
+    // 4. Reset Terminal Sessions
+    setTerminalSessions([
+      { id: 'default', name: 'Terminal', output: ['\u001b[36m⚡ AURA TERMINAL ENGINE V5.0.0\u001b[0m', 'Ready for intelligent development...', ''] }
+    ]);
+    setActiveTerminalId('default');
+
+    // 5. Clear Problems & UI Tabs
+    setProblems([]);
+    setSidebarTab('files');
+    setBottomTab('terminal');
+
+    appendTerminalOutput('[SYSTEM] Project closed. All panels reset.');
   };
 
   const testGithubConnection = async () => {
