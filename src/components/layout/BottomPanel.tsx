@@ -6,7 +6,7 @@ import { FileItem } from '@/types';
 
 interface BottomPanelProps {
   zenMode: boolean;
-  bottomPanelHeight: number;
+  bottomHeight: number;
   setIsResizingBottom: (v: boolean) => void;
   bottomTab: 'terminal' | 'problems' | 'output' | 'debug';
   setBottomTab: (tab: 'terminal' | 'problems' | 'output' | 'debug') => void;
@@ -32,7 +32,7 @@ interface BottomPanelProps {
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({
   zenMode,
-  bottomPanelHeight,
+  bottomHeight,
   setIsResizingBottom,
   bottomTab,
   setBottomTab,
@@ -130,7 +130,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                 id={currentSession?.id}
                 output={currentSession?.output || []}
                 isRunning={currentSession?.isRunning}
-                height={bottomPanelHeight - 80}
+                height={bottomHeight - 80}
               />
               
               <div className="absolute top-2 right-4 text-blue-400/30 font-black text-[9px] tracking-widest uppercase pointer-events-none z-10">
@@ -248,7 +248,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
 
   return (
     <div 
-      style={{ height: bottomPanelHeight }}
+      style={{ height: bottomHeight }}
       className="bg-[#1e1e1e] border-t border-white/10 flex flex-col relative shrink-0"
     >
       {/* Resizer Handle (Horizontal) - Premium Drag Area */}

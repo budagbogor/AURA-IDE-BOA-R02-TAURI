@@ -114,7 +114,7 @@ export const TerminalAdapter: React.FC<TerminalAdapterProps> = ({
   return (
     <div 
       ref={terminalRef} 
-      className="xterm-container h-full w-full overflow-hidden" 
+      className="xterm-container h-full w-full overflow-hidden px-4 pt-2" 
       style={{ backgroundColor: '#0a0a0a' }}
     />
   );

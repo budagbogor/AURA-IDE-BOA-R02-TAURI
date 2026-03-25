@@ -51,7 +51,6 @@ interface SidebarProps {
   chatEndRef: React.RefObject<HTMLDivElement>;
   githubUser: any | null;
   githubConnected: boolean;
-  setGithubConnected: (connected: boolean) => void;
   githubToken: string;
   setGithubToken: (token: string) => void;
   githubRepos: any[];
@@ -256,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   composerMessages, setComposerMessages,
   chatInput, setChatInput, isAiLoading, handleSendMessage,
   attachedFiles, setAttachedFiles, removeAttachment, handleFileUpload,
-  fileInputRef, chatEndRef, githubUser, githubConnected, setGithubConnected,
+  fileInputRef, chatEndRef, githubUser, githubConnected,
   githubToken, setGithubToken, githubRepos, setGithubRepos,
   isFetchingRepos, setIsFetchingRepos, repoSearchInput, setRepoSearchInput,
   handleCloneRepo, 

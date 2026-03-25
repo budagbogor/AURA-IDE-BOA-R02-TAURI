@@ -96,6 +96,12 @@ import { generateSumopodContent } from './services/sumopodService';
 import { mcpManager } from './services/mcpService';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { useGithub } from './hooks/useGithub';
+import { useTerminal } from './hooks/useTerminal';
+import { useAiManager } from './hooks/useAiManager';
+import { useLayout } from './hooks/useLayout';
+import { useEditor } from './hooks/useEditor';
+import { useAiChat } from './hooks/useAiChat';
 
 // Windows Installer / Desktop Mode Helpers
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
@@ -167,264 +173,155 @@ interface CodeProblem {
 
 
 export default function App() {
-  const [TauriCommand, setTauriCommand] = useState<any>(null);
-  const [tauriDialog, setTauriDialog] = useState<any>(null);
-  const [tauriFs, setTauriFs] = useState<any>(null);
-  const [nativeProjectPath, setNativeProjectPath] = useState<string | null>(null);
-  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
-  const [stagingFiles, setStagingFiles] = useState<StagingFile[]>([]);
+  const {
+    layoutMode, setLayoutMode,
+    zenMode, setZenMode,
+    showBottomPanel, setShowBottomPanel,
+    showAiPanel, setShowAiPanel,
+    sidebarTab, setSidebarTab,
+    bottomTab, setBottomTab,
+    context7Mode, setContext7Mode,
+    sidebarWidth, setSidebarWidth,
+    bottomHeight, setBottomHeight,
+    aiPanelWidth, setAiPanelWidth,
+    isResizingSidebar, setIsResizingSidebar,
+    isResizingBottom, setIsResizingBottom,
+    isResizingAiPanel, setIsResizingAiPanel,
+    showCommandPalette, setShowCommandPalette,
+    showFileSearch, setShowFileSearch,
+    showGuideModal, setShowGuideModal,
+    showCreateProjectModal, setShowCreateProjectModal,
+    commandInput, setCommandInput,
+    fileSearchInput, setFileSearchInput,
+    repoSearchInput, setRepoSearchInput,
+    newMcpName, setNewMcpName,
+    newMcpUrl, setNewMcpUrl,
+    newMcpType, setNewMcpType,
+    newMcpEnvStr, setNewMcpEnvStr,
+    selectedMcpTemplateIdx, setSelectedMcpTemplateIdx,
+    mcpTemplateData, setMcpTemplateData,
+    showMcpLogsFor, setShowMcpLogsFor,
+    activeMcpLogs, setActiveMcpLogs,
+    TauriCommand, setTauriCommand,
+    tauriDialog, setTauriDialog,
+    tauriFs, setTauriFs
+  } = useLayout();
 
+  const {
+    files, setFiles,
+    activeFileId, setActiveFileId,
+    activeFile,
+    projectName, setProjectName,
+    problems, setProblems,
+    isScanning, setIsScanning,
+    editorFontSize, setEditorFontSize,
+    nativeProjectPath, setNativeProjectPath,
+    stagingFiles, setStagingFiles,
+    autoFixTrigger, setAutoFixTrigger,
+    autoFixMsg, setAutoFixMsg
+  } = useEditor();
+
+  const {
+    chatMessages, setChatMessages,
+    composerMessages, setComposerMessages,
+    chatInput, setChatInput,
+    isAiLoading, setIsAiLoading,
+    attachedFiles, setAttachedFiles,
+    selectedSkill, setSelectedSkill,
+    aiRules, setAiRules,
+    systemInstruction, setSystemInstruction
+  } = useAiChat();
+
+  const [mcpServers, setMcpServers] = useState<any[]>(() => {
+    const saved = localStorage.getItem('aura_mcp_servers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((p: any) => ({
+          ...p,
+          type: p.type || 'sse',
+          tools: p.tools || []
+        }));
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const activeProcessRef = useRef<any>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-      import('@tauri-apps/plugin-shell').then(m => { setTauriCommand(() => m.Command); });
-      import('@tauri-apps/plugin-dialog').then(m => { setTauriDialog(m); });
-      import('@tauri-apps/plugin-fs').then(m => { setTauriFs(m); });
-      import('@tauri-apps/api/window').then(m => { m.getCurrentWindow().maximize().catch(() => {}); });
-    }
-    
-    // Cleanup active process on unmount
-    return () => {
-      if (activeProcessRef.current) {
-        activeProcessRef.current.kill().catch(() => {});
-      }
-    };
-  }, []);
-
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showFileSearch, setShowFileSearch] = useState(false);
-  const [showGuideModal, setShowGuideModal] = useState(false);
-  const [commandInput, setCommandInput] = useState('');
-  const [fileSearchInput, setFileSearchInput] = useState('');
-  const [repoSearchInput, setRepoSearchInput] = useState('');
-  const [activeFileId, setActiveFileId] = useState<string>('');
-  const [layoutMode, setLayoutMode] = useState<'classic' | 'modern'>('classic');
-  const [projectName, setProjectName] = useState('AURA-PROJECT');
-  
-  // -- Auto-Fix Variables --
-  const [autoFixTrigger, setAutoFixTrigger] = useState(0);
-  const [autoFixMsg, setAutoFixMsg] = useState("");
-  
-  const activeFile = files.find(f => f.id === activeFileId) || (files.length > 0 ? files[0] : null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'P') {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      } else if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        setShowFileSearch(true);
-      } else if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        handleSaveFile();
-      } else if (e.ctrlKey && e.key === 'b') {
-        e.preventDefault();
-        setSidebarWidth(prev => prev === 0 ? 300 : 0);
-      } else if (e.ctrlKey && e.key === '`') {
-        e.preventDefault();
-        setShowBottomPanel(prev => !prev);
-      } else if (e.key === 'Escape') {
-        setShowCommandPalette(false);
-        setShowFileSearch(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const [showBottomPanel, setShowBottomPanel] = useState(true);
-  const [showAiPanel, setShowAiPanel] = useState(true);
-  const [bottomTab, setBottomTab] = useState<'terminal' | 'problems' | 'output' | 'debug'>('terminal');
-  const [sidebarTab, setSidebarTab] = useState<'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database'>('files');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Welcome to **Aura AI IDE**. I am your coding assistant. How can I help you today?' }
-  ]);
-  const [composerMessages, setComposerMessages] = useState<any[]>([
-    { role: 'assistant', content: 'Assalamualaikum...' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // --- Layout Coordination Fase 5 ---
   // Pastikan panel AI tidak muncul duplikat di kiri dan kanan
-  useEffect(() => {
-    if (sidebarTab === 'ai' && showAiPanel) {
-      setShowAiPanel(false);
-    }
-  }, [sidebarTab]);
+  // Logic has been moved to useLayout.ts
 
-  useEffect(() => {
-    if (showAiPanel && sidebarTab === 'ai') {
-      setSidebarTab('files');
-    }
-  }, [showAiPanel]);
 
-  const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([
-    { id: 'default', name: 'Terminal', output: ['\u001b[36m⚡ AURA TERMINAL ENGINE V5.0.0\u001b[0m', 'Ready for intelligent development...', ''] }
-  ]);
-  const [activeTerminalId, setActiveTerminalId] = useState('default');
+  // -- HOOKS --
+  const {
+    terminalSessions,
+    setTerminalSessions,
+    activeTerminalId,
+    setActiveTerminalId,
+    currentSession,
+    appendTerminalOutput,
+    addTerminalSession,
+    closeTerminalSession
+  } = useTerminal();
+
+  const {
+    aiProvider, setAiProvider,
+    geminiApiKey, setGeminiApiKey,
+    openRouterApiKey, setOpenRouterApiKey,
+    bytezApiKey, setBytezApiKey,
+    sumopodApiKey, setSumopodApiKey,
+    selectedModel, setSelectedModel,
+    openRouterModel, setOpenRouterModel,
+    bytezModel, setBytezModel,
+    sumopodModel, setSumopodModel,
+    dynamicFreeModels,
+    setDynamicFreeModels,
+    isFetchingModels,
+    setIsFetchingModels,
+    testAiConnection,
+    testingStatus,
+    setTestingStatus,
+    testError,
+    setTestError
+  } = useAiManager(appendTerminalOutput);
+
+  // syncFilesFromNativePath will be defined later but we need it for useGithub
+  // Since useGithub needs it as a prop, we pass it. 
+  // We will move its definition above the hooks or use a ref.
   
-  const currentSession = terminalSessions.find(s => s.id === activeTerminalId) || terminalSessions[0];
-
-  const appendTerminalOutput = (data: string | string[], sessionId?: string) => {
-    const targetId = sessionId || activeTerminalId;
-    const lines = Array.isArray(data) ? data : [data];
-    
-    // 1. Update React State for historical persistence (tab switching, etc)
-    setTerminalSessions(prev => prev.map(s => 
-      s.id === targetId ? { ...s, output: [...s.output, ...lines] } : s
-    ));
-
-    // 2. Direct-Write EventBus for real-time high-throughput rendering (bypasses React loop)
-    window.dispatchEvent(new CustomEvent('terminal-write', {
-      detail: { id: targetId, data: lines.join('\n') }
-    }));
-  };
-
-  const addTerminalSession = () => {
-    const newId = `term-${Date.now()}`;
-    const newSession: TerminalSession = {
-      id: newId,
-      name: `Terminal ${terminalSessions.length + 1}`,
-      output: [`[AURA] New session started at ${new Date().toLocaleTimeString()}`]
-    };
-    setTerminalSessions(prev => [...prev, newSession]);
-    setActiveTerminalId(newId);
-  };
-
-  const closeTerminalSession = (id: string) => {
-    if (terminalSessions.length <= 1) return;
-    setTerminalSessions(prev => {
-      const filtered = prev.filter(s => s.id !== id);
-      if (activeTerminalId === id) {
-        setActiveTerminalId(filtered[0].id);
-      }
-      return filtered;
-    });
-  };
-  const [githubConnected, setGithubConnected] = useState(false);
-  const [githubToken, setGithubToken] = useState(() => localStorage.getItem('aura_github_token') || '');
-  const [githubUser, setGithubUser] = useState<any | null>(null);
-  const [githubRepos, setGithubRepos] = useState<any[]>([]);
-  const [isFetchingRepos, setIsFetchingRepos] = useState(false);
-
-  const handleCloneRepo = async (repo: any) => {
-    if (!githubToken) return;
-
-    let selectedPath: string | null = null;
-    let projectDirHandle: any = null; // Web mode only
-
-    if (isTauri && tauriDialog) {
-      // Desktop Mode: Get real OS path
-      try {
-        const selected = await tauriDialog.open({
-          directory: true,
-          multiple: false,
-          title: `Pilih Folder (Select as folder repository) untuk Meng-clone ${repo.name}`
-        });
-        if (selected && typeof selected === 'string') {
-          selectedPath = `${selected.replace(/\\/g, '/')}/${repo.name}`;
-          appendTerminalOutput(`[GITHUB] Target folder (Native): ${selectedPath}`);
-        } else {
-          appendTerminalOutput('[GITHUB] Clone dibatalkan oleh pengguna.');
-          return;
-        }
-      } catch (err) {
-        console.error('Tauri Dialog Error:', err);
-        return;
-      }
-    } else {
-      // Web Mode: Original Directory Picker
-      try {
-        // @ts-ignore
-        const baseDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        projectDirHandle = await baseDirHandle.getDirectoryHandle(repo.name, { create: true });
-      } catch (err) {
-        console.log('User cancelled or directory picker unsupported:', err);
-        appendTerminalOutput('[GITHUB] Clone cancelled. Please select a folder to save the repository.');
-        return;
-      }
-    }
-
-    setIsFetchingRepos(true);
-    appendTerminalOutput(`[GITHUB] Cloning repository ${repo.full_name}...`);
-    
-    try {
-      const clonedFiles = await cloneRepository(githubToken, repo.owner.login, repo.name);
-      
-      if (clonedFiles.length > 0) {
-        appendTerminalOutput(`[SYSTEM] Menyimpan ${clonedFiles.length} file ke ${selectedPath ? 'Disk Lokal' : 'Memori Browser'}...`);
-        
-        if (selectedPath && tauriFs) {
-          // Desktop Logic: Write to real disk using Tauri FS
-          try {
-            await tauriFs.mkdir(selectedPath, { recursive: true });
-          } catch (e) {}
-
-          for (const file of clonedFiles) {
-            const pathParts = file.id.split('/');
-            const fileName = pathParts.pop()!;
-            let currentPath = selectedPath;
-            
-            // Recreate folder structure
-            for (const dirName of pathParts) {
-              currentPath = `${currentPath}/${dirName}`;
-              try {
-                await tauriFs.mkdir(currentPath, { recursive: true });
-              } catch (e) {}
-            }
-            
-            await tauriFs.writeTextFile(`${currentPath}/${fileName}`, file.content);
-          }
-          
-          setNativeProjectPath(selectedPath);
-          // Update state immediately with cloned files so sidebar shows them right away
-          // We map the relative ID to absolute path for consistency with syncFilesFromNativePath
-          const mappedFiles = clonedFiles.map(f => ({
-            ...f,
-            id: `${selectedPath}/${f.id}`
-          }));
-          setFiles(mappedFiles);
-          
-          // Re-sync to ensure everything is perfect
-          await syncFilesFromNativePath(selectedPath);
-          
-          appendTerminalOutput(`[SUCCESS] Clone berhasil! Terminal kini aktif di: ${selectedPath}`);
-          alert(`Berhasil meng-clone ke ${selectedPath}. Terminal sekarang terhubung.`);
-        } else if (projectDirHandle) {
-          // Web Logic: Original FileSystem API
-          for (const file of clonedFiles) {
-            const pathParts = file.id.split('/');
-            const fileName = pathParts.pop()!;
-            let currentDir = projectDirHandle;
-            for (const dirName of pathParts) {
-              currentDir = await currentDir.getDirectoryHandle(dirName, { create: true });
-            }
-            const fileHandle = await currentDir.getFileHandle(fileName, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(file.content);
-            await writable.close();
-          }
-          setFiles(clonedFiles);
-        }
-
-        setProjectName(repo.name.toUpperCase());
-        setSidebarTab('files');
-        if (clonedFiles.length > 0) setActiveFileId(clonedFiles[0].id);
-      } else {
-        appendTerminalOutput(`[GITHUB] Repository ${repo.full_name} is empty.`);
-      }
-    } catch (error) {
-      appendTerminalOutput(`[GITHUB] Error cloning repository: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsFetchingRepos(false);
-    }
-  };
+  const {
+    githubConnected,
+    githubToken,
+    setGithubToken,
+    githubUser,
+    setGithubUser,
+    githubRepos,
+    setGithubRepos,
+    isFetchingRepos,
+    setIsFetchingRepos,
+    handleCloneRepo,
+    testGithubConnection
+  } = useGithub({
+    isTauri,
+    tauriDialog,
+    tauriFs,
+    appendTerminalOutput,
+    setNativeProjectPath,
+    setFiles,
+    syncFilesFromNativePath: async (path: string) => await syncFilesFromNativePath(path),
+    setProjectName,
+    setSidebarTab: (tab: any) => setSidebarTab(tab),
+    setActiveFileId,
+    setTestingStatus,
+    setTestError
+  });
 
 
   const handleSaveFile = async () => {
@@ -488,55 +385,7 @@ export default function App() {
     appendTerminalOutput('[SYSTEM] Project closed. All panels reset.');
   };
 
-  const testGithubConnection = async () => {
-    if (!githubToken) return;
-    setTestingStatus(prev => ({ ...prev, github: 'loading' }));
-    try {
-      const profile = await fetchUserProfile(githubToken);
-      setGithubUser(profile);
-      setGithubConnected(true);
-      setTestingStatus(prev => ({ ...prev, github: 'success' }));
-      appendTerminalOutput(`[GITHUB] Koneksi berhasil! Terhubung sebagai @${profile.login}`);
-    } catch (err: any) {
-      setGithubConnected(false);
-      setTestingStatus(prev => ({ ...prev, github: 'error' }));
-      setTestError(prev => ({ ...prev, github: err.message }));
-      appendTerminalOutput(`[GITHUB ERROR] ${err.message}`);
-    }
-  };
 
-  const testAiConnection = async (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod') => {
-    setTestingStatus(prev => ({ ...prev, [provider]: 'loading' }));
-    try {
-      if (provider === 'gemini') {
-        const apiKey = geminiApiKey || process.env.GEMINI_API_KEY || '';
-        if (!apiKey) throw new Error('API Key kosong');
-        const ai = getGeminiAI(apiKey);
-        await ai.models.generateContent({
-          model: selectedModel,
-          contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
-        });
-      } else if (provider === 'openrouter') {
-        const apiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || '';
-        if (!apiKey) throw new Error('API Key kosong');
-        await generateOpenRouterContent(openRouterModel, 'ping', apiKey);
-      } else if (provider === 'bytez') {
-        const apiKey = bytezApiKey || '';
-        if (!apiKey) throw new Error('API Key kosong');
-        await generateBytezContent(bytezModel, 'ping', apiKey, geminiApiKey);
-      } else if (provider === 'sumopod') {
-        const apiKey = sumopodApiKey || '';
-        if (!apiKey) throw new Error('API Key kosong');
-        await generateSumopodContent(apiKey, sumopodModel, [{ role: 'user', content: 'ping' }]);
-      }
-      setTestingStatus(prev => ({ ...prev, [provider]: 'success' }));
-      appendTerminalOutput(`[AI] Koneksi ${provider.toUpperCase()} berhasil!`);
-    } catch (err: any) {
-      setTestingStatus(prev => ({ ...prev, [provider]: 'error' }));
-      setTestError(prev => ({ ...prev, [provider]: err.message }));
-      appendTerminalOutput(`[AI ERROR] ${provider.toUpperCase()}: ${err.message}`);
-    }
-  };
 
   const resetAllConnections = () => {
     if (!confirm("Apakah Anda yakin ingin menghapus SEMUA koneksi (API Keys, GitHub Token, Supabase)? Ini tidak dapat dibatalkan.")) return;
@@ -547,7 +396,7 @@ export default function App() {
     setBytezApiKey('');
     setSumopodApiKey('');
     setGithubToken('');
-    setGithubConnected(false);
+    setGithubToken('');
     setGithubUser(null);
     setTestingStatus({});
     setTestError({});
@@ -564,170 +413,7 @@ export default function App() {
     alert("Seluruh koneksi telah berhasil di-reset.");
   };
 
-  const [mcpServers, setMcpServers] = useState<any[]>(() => {
-    const saved = localStorage.getItem('aura_mcp_servers');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.map((p: any) => ({
-          ...p,
-          type: p.type || 'sse',
-          tools: p.tools || []
-        }));
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
-  const [newMcpName, setNewMcpName] = useState(MCP_TEMPLATES[0].name);
-  const [newMcpUrl, setNewMcpUrl] = useState(MCP_TEMPLATES[0].commandTemplate);
-  const [newMcpType, setNewMcpType] = useState<'sse' | 'stdio'>(MCP_TEMPLATES[0].type as any);
-  const [newMcpEnvStr, setNewMcpEnvStr] = useState('');
-  const [selectedMcpTemplateIdx, setSelectedMcpTemplateIdx] = useState<number | 'custom'>(0);
-  const [mcpTemplateData, setMcpTemplateData] = useState<Record<string, string>>({});
-  const [showMcpLogsFor, setShowMcpLogsFor] = useState<string | null>(null);
-  const [activeMcpLogs, setActiveMcpLogs] = useState<string[]>([]);
-  const [testingStatus, setTestingStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
-  const [testError, setTestError] = useState<Record<string, string>>({});
-  const [editorFontSize, setEditorFontSize] = useState(14);
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'openrouter' | 'bytez' | 'sumopod'>(() => (localStorage.getItem('aiProvider') as any) || 'gemini');
-  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('aura_gemini_key') || process.env.GEMINI_API_KEY || '');
-  const [openRouterApiKey, setOpenRouterApiKey] = useState(() => localStorage.getItem('aura_openrouter_key') || process.env.OPENROUTER_API_KEY || '');
-  const [bytezApiKey, setBytezApiKey] = useState(() => localStorage.getItem('aura_bytez_key') || process.env.BYTEZ_API_KEY || '');
-  const [sumopodApiKey, setSumopodApiKey] = useState(() => localStorage.getItem('sumopodApiKey') || '');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
-  const [openRouterModel, setOpenRouterModel] = useState('auto-free');
-  const [bytezModel, setBytezModel] = useState(() => localStorage.getItem('bytezModel') || BYTEZ_MODELS[0].id);
-  const [sumopodModel, setSumopodModel] = useState(() => localStorage.getItem('sumopodModel') || SUMOPOD_MODELS[0].id);
-  const [dynamicFreeModels, setDynamicFreeModels] = useState<OpenRouterModel[]>(FREE_MODELS);
-  const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; data: string; content?: string }[]>([]);
-  const [problems, setProblems] = useState<CodeProblem[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
-  const [aiRules, setAiRules] = useState<string>('');
-  const [context7Mode, setContext7Mode] = useState(false);
-  const [systemInstruction, setSystemInstruction] = useState<string>('You are an expert AI coding assistant.');
-  const [selectedSkill, setSelectedSkill] = useState<string>('Default');
-  const [zenMode, setZenMode] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Context7 Auto-Connect Effect
-  useEffect(() => {
-    if (context7Mode && isTauri) {
-      const existing = mcpServers.find(s => s.name === 'context7');
-      if (!existing || !existing.connected) {
-        const template = MCP_TEMPLATES.find(t => t.name === 'context7');
-        if (template) {
-          if (!existing) {
-            const newServer: any = {
-              name: template.name,
-              url: template.commandTemplate,
-              type: template.type as any,
-              connected: false,
-              tools: [],
-              logs: []
-            };
-            setMcpServers(prev => [...prev, newServer]);
-          }
-          
-          // Trigger connection
-          const connectContext7 = async () => {
-             try {
-              const tools = await mcpManager.connect({
-                name: template.name,
-                serverUrl: template.commandTemplate,
-                type: template.type as any
-              });
-              setMcpServers(prev => prev.map(s => s.name === template.name ? { ...s, connected: true, tools: tools || [] } : s));
-              appendTerminalOutput(`[CONTEXT7] Server dokumentasi terhubung. Siap membantu mencegah halusinasi dengan data terbaru.`);
-            } catch (err: any) {
-              console.error('Context7 connection failed:', err);
-              const errMsg = err?.message || (typeof err === 'string' ? err : 'Aplikasi tidak dapat menjangkau server MCP. Pastikan Node.js terinstal.');
-              appendTerminalOutput(`[CONTEXT7 ERROR] Gagal terhubung ke library dokumentasi: ${errMsg}`);
-            }
-          };
-          connectContext7();
-        }
-      }
-    }
-  }, [context7Mode]);
-
-  // Resizing State
-  const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [aiPanelWidth, setAiPanelWidth] = useState(450);
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(250);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [isResizingBottom, setIsResizingBottom] = useState(false);
-  const [isResizingAiPanel, setIsResizingAiPanel] = useState(false);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingSidebar) {
-        let newWidth;
-        if (layoutMode === 'modern') {
-          newWidth = window.innerWidth - e.clientX - 56; // 56 is Activity Bar width
-        } else {
-          newWidth = e.clientX - 56;
-        }
-        if (newWidth > 150 && newWidth < 900) {
-          setSidebarWidth(newWidth);
-        }
-      }
-      if (isResizingBottom) {
-        const newHeight = window.innerHeight - e.clientY - 44; 
-        if (newHeight > 60 && newHeight < window.innerHeight - 100) {
-          setBottomPanelHeight(newHeight);
-        }
-      }
-
-      if (isResizingAiPanel) {
-        let newWidth;
-        if (layoutMode === 'modern') {
-          newWidth = e.clientX - 56; // In modern, AI is on the left
-        } else {
-          newWidth = window.innerWidth - e.clientX;
-        }
-        if (newWidth > 200 && newWidth < 800) {
-          setAiPanelWidth(newWidth);
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizingSidebar(false);
-      setIsResizingBottom(false);
-      setIsResizingAiPanel(false);
-      document.body.style.cursor = 'default';
-    };
-
-    if (isResizingSidebar || isResizingBottom || isResizingAiPanel) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizingSidebar, isResizingBottom, isResizingAiPanel, layoutMode]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_gemini_key', geminiApiKey);
-  }, [geminiApiKey]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_openrouter_key', openRouterApiKey);
-  }, [openRouterApiKey]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_bytez_key', bytezApiKey);
-    localStorage.setItem('bytezModel', bytezModel);
-    localStorage.setItem('sumopodApiKey', sumopodApiKey);
-    localStorage.setItem('sumopodModel', sumopodModel);
-    localStorage.setItem('aiProvider', aiProvider);
-  }, [bytezApiKey, bytezModel, sumopodApiKey, sumopodModel, aiProvider]);
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -757,45 +443,12 @@ export default function App() {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('aura_github_token', githubToken);
-    if (githubToken) {
-      const loadProfile = async () => {
-        try {
-          const profile = await fetchUserProfile(githubToken);
-          setGithubUser(profile);
-          setGithubConnected(true);
-          
-          // Also fetch repos if they are empty
-          if (githubRepos.length === 0) {
-            const repos = await fetchUserRepos(githubToken);
-            setGithubRepos(repos);
-          }
-        } catch (err) {
-          console.error("Failed to load GitHub profile:", err);
-          setGithubConnected(false);
-          setGithubUser(null);
-        }
-      };
-      loadProfile();
-    } else {
-      setGithubConnected(false);
-      setGithubUser(null);
-      setGithubRepos([]);
-    }
-  }, [githubToken]);
 
 
 
   useEffect(() => {
     localStorage.setItem('aura_mcp_servers', JSON.stringify(mcpServers));
   }, [mcpServers]);
-
-  useEffect(() => {
-    if (aiProvider === 'openrouter') {
-      refreshModels();
-    }
-  }, [aiProvider]);
 
   const refreshModels = async () => {
     setIsFetchingModels(true);
@@ -1995,7 +1648,6 @@ Integrations:
         chatEndRef={chatEndRef}
         githubUser={githubUser}
         githubConnected={githubConnected}
-        setGithubConnected={setGithubConnected}
         githubToken={githubToken}
         setGithubToken={setGithubToken}
         githubRepos={githubRepos}
@@ -2156,7 +1808,7 @@ Integrations:
         {showBottomPanel && (
           <BottomPanel
             zenMode={zenMode}
-            bottomPanelHeight={bottomPanelHeight}
+            bottomHeight={bottomHeight}
             setIsResizingBottom={setIsResizingBottom}
             bottomTab={bottomTab}
             setBottomTab={setBottomTab}
