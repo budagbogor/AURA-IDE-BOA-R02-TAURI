@@ -129,6 +129,7 @@ interface FileItem {
   content: string;
   language: string;
   path?: string;
+  lastModified?: number;
 }
 
 interface ChatMessage {
@@ -1197,7 +1198,7 @@ Integrations:
     if (packageJson) {
       appendTerminalOutput('[AURA MAGIC] Terdeteksi package.json. Menyiapkan environment...');
       if (stats.fileCount > 3 || stats.commands.some(c => c.includes('create-react-app') || c.includes('vite'))) {
-        executeCommand('npm install && npm start');
+        executeCommand('npm install && npm run dev');
         appendTerminalOutput('[AURA MAGIC] Menjalankan npm install & start di latar belakang...');
         setTimeout(() => {
           appendTerminalOutput('[AURA MAGIC] Lingkungan siap. Silakan buka localhost di browser Anda.');
@@ -1206,6 +1207,61 @@ Integrations:
     } else {
       appendTerminalOutput('[AURA MAGIC] Perubahan diterapkan.');
     }
+  };
+
+  const handleApplyCode = async (path: string, content: string, action?: 'create_or_modify' | 'delete') => {
+    const isDelete = action === 'delete';
+    
+    // 1. Update React State
+    setFiles(currentFiles => {
+      if (isDelete) {
+        return currentFiles.filter(f => f.id !== path && f.name !== path);
+      }
+      const idx = currentFiles.findIndex(f => f.id === path || f.name === path);
+      if (idx !== -1) {
+        const existing = currentFiles[idx];
+        if (existing.content === content) return currentFiles;
+        const updated = [...currentFiles];
+        updated[idx] = { ...existing, content, lastModified: Date.now() };
+        return updated;
+      }
+      return [...currentFiles, { 
+        id: path, 
+        name: path.split('/').pop() || path, 
+        content, 
+        language: path.endsWith('.ts') || path.endsWith('.tsx') ? 'typescript' : 'javascript',
+        lastModified: Date.now()
+      }];
+    });
+
+    // 2. Sync to Native Disk (Tauri)
+    if (nativeProjectPath && tauriFs) {
+      try {
+        let fullPath = path;
+        if (!path.startsWith(nativeProjectPath) && !path.includes(':')) {
+          fullPath = `${nativeProjectPath}/${path}`.replace(/\/+/g, '/').replace(/\\+/g, '\\');
+        }
+        
+        if (isDelete) {
+          try { await tauriFs.removeFile(fullPath); } catch (e) {}
+        } else {
+          const pathParts = fullPath.split(/[\\/]/);
+          pathParts.pop(); 
+          let currentDir = "";
+          for (const part of pathParts) {
+            if (!part) continue;
+            currentDir += (currentDir ? "/" : "") + part;
+            if (currentDir.length <= 3 && currentDir.includes(':')) continue; 
+            try { await tauriFs.mkdir(currentDir, { recursive: true }); } catch (e) {}
+          }
+          await tauriFs.writeTextFile(fullPath, content);
+        }
+      } catch (err) {
+        console.error('[AURA FS] Sync Error:', err);
+      }
+    }
+
+    if (!isDelete && activeFileId !== path) setActiveFileId(path);
   };
 
   const handleAutoPreview = (force: boolean = false) => {
@@ -1268,6 +1324,30 @@ Integrations:
     // Build a VSCode-like prompt with full path
     const cwdDisplay = nativeProjectPath || 'aura-project';
     appendOutput(`${cwdDisplay} $ ${val}`);
+
+    // --- PROTECTIVE CHECK FOR NPM INSTALL ---
+    if (val.trim() === 'npm install' || val.trim() === 'npm i') {
+       const hasPackageJson = files.some(f => f.name === 'package.json');
+       if (!hasPackageJson) {
+          appendOutput(`[SYSTEM] ⚠️ WARNING: 'package.json' tidak ditemukan di project ini.`);
+          appendOutput(`[SYSTEM] Perintah 'npm install' akan gagal. Membuat file 'package.json' default...`);
+          
+          const defaultPackageJson = {
+            name: projectName.toLowerCase().replace(/\s+/g, '-'),
+            version: "1.0.0",
+            private: true,
+            dependencies: {},
+            scripts: {
+              "dev": "vite",
+              "build": "vite build",
+              "preview": "vite preview"
+            }
+          };
+          
+          handleApplyCode('package.json', JSON.stringify(defaultPackageJson, null, 2), 'create_or_modify');
+          appendOutput(`[SYSTEM] ✅ 'package.json' telah dibuat otomatis.`);
+       }
+    }
 
     // If running in Tauri Desktop mode, use PowerShell as the universal shell (like VSCode)
     if (isTauri && TauriCommand) {
@@ -1337,20 +1417,16 @@ Integrations:
         try {
           if (isTauri && window.navigator.platform.includes('Win')) {
             // Windows Triple-Layer Robust Strategy:
-            // 1. If it's a simple 'npm' command, try running it directly first (fastest, most reliable for path)
-            // 2. Fallback to 'cmd /S /C' with explicit quoting (most compatible for all Windows versions)
-            // 3. Last resort: PowerShell with ExecutionPolicy Bypass
+            // 1. Force use npm.cmd or cmd /C for all npm commands to ensure batch scripts run correctly
+            // 2. Use cmd /S /C with explicit quoting for reliability
             
-            const [prog, ...args] = trimmedVal.split(' ');
-            
-            if (isNpm && trimmedVal.split(' ').length <= 3) {
-               // Simple npm command (e.g. 'npm install', 'npm -v')
-               appendOutput(`[SYSTEM] Mencoba eksekusi langsung: ${trimmedVal}`);
-               cmdInstance = TauriCommand.create('npm', args, { cwd: normalizedCwd });
+            if (isNpm) {
+               // Use cmd /C for npm to ensure it finds npm.cmd and captures output correctly
+               appendOutput(`[SYSTEM] Menjalankan npm melalui CMD: ${trimmedVal}`);
+               cmdInstance = TauriCommand.create('cmd', ['/S', '/C', `"${trimmedVal}"`], { cwd: normalizedCwd });
             } else {
-               // Complex command or non-npm
+               // Non-npm command
                appendOutput(`[SYSTEM] Menggunakan Shell Optimasi: CMD /S /C`);
-               // NOTE: /S /C with quotes is the industry standard for robust CMD execution
                cmdInstance = TauriCommand.create('cmd', ['/S', '/C', `"${trimmedVal}"`], { cwd: normalizedCwd });
             }
           } else {
@@ -2126,61 +2202,7 @@ Integrations:
               autoFixTrigger={autoFixTrigger}
               autoFixMessage={autoFixMsg}
               onExecuteCommand={executeCommand}
-              onApplyCode={async (path, content, action) => {
-                const isDelete = action === 'delete';
-                
-                // 1. Update React State
-                setFiles(currentFiles => {
-                  if (isDelete) {
-                    return currentFiles.filter(f => f.id !== path && f.name !== path);
-                  }
-                  const idx = currentFiles.findIndex(f => f.id === path || f.name === path);
-                  if (idx !== -1) {
-                    const existing = currentFiles[idx];
-                    if (existing.content === content) return currentFiles;
-                    const updated = [...currentFiles];
-                    updated[idx] = { ...existing, content };
-                    return updated;
-                  }
-                  return [...currentFiles, { 
-                    id: path, 
-                    name: path.split('/').pop() || path, 
-                    content, 
-                    language: path.endsWith('.ts') || path.endsWith('.tsx') ? 'typescript' : 'javascript'
-                  }];
-                });
-
-                // 2. Sync to Native Disk (Tauri)
-                if (nativeProjectPath && tauriFs) {
-                  try {
-                    // Normalize path
-                    let fullPath = path;
-                    if (!path.startsWith(nativeProjectPath) && !path.includes(':')) {
-                      fullPath = `${nativeProjectPath}/${path}`.replace(/\/+/g, '/').replace(/\\+/g, '\\');
-                    }
-                    
-                    if (isDelete) {
-                      try { await tauriFs.removeFile(fullPath); } catch (e) {}
-                    } else {
-                      // Create directory structure if needed
-                      const pathParts = fullPath.split(/[\\/]/);
-                      pathParts.pop(); 
-                      let currentDir = "";
-                      for (const part of pathParts) {
-                        if (!part) continue;
-                        currentDir += (currentDir ? "/" : "") + part;
-                        if (currentDir.length <= 3 && currentDir.includes(':')) continue; 
-                        try { await tauriFs.mkdir(currentDir, { recursive: true }); } catch (e) {}
-                      }
-                      await tauriFs.writeTextFile(fullPath, content);
-                    }
-                  } catch (err) {
-                    console.error('[AURA FS] Sync Error:', err);
-                  }
-                }
-
-                if (!isDelete && activeFileId !== path) setActiveFileId(path);
-              }}
+              onApplyCode={handleApplyCode}
             />
           </div>
         </div>
