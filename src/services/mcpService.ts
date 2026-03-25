@@ -38,7 +38,10 @@ export class TauriStdioTransport implements Transport {
         const checkCmd = Command.create('cmd', ['/c', 'where', 'npx']);
         const out = await checkCmd.execute();
         if (out.code === 0 && out.stdout) {
-           const fullPath = out.stdout.split('\r\n')[0].trim();
+           const lines = out.stdout.split('\r\n').filter(l => l.trim());
+           // PREFER .cmd or .exe on Windows
+           const preferred = lines.find(l => l.toLowerCase().endsWith('.cmd') || l.toLowerCase().endsWith('.exe')) || lines[0];
+           const fullPath = preferred.trim();
            finalCommand = `"${fullPath}" ${this.commandStr.substring(3).trim()}`;
            this.onlog?.(`[MCP INFO] Resolved npx to: ${fullPath}`);
         }

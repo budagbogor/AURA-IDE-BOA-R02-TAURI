@@ -628,7 +628,8 @@ export default function App() {
               appendTerminalOutput(`[CONTEXT7] Server dokumentasi terhubung. Siap membantu mencegah halusinasi dengan data terbaru.`);
             } catch (err: any) {
               console.error('Context7 connection failed:', err);
-              appendTerminalOutput(`[CONTEXT7 ERROR] Gagal terhubung ke library dokumentasi: ${err.message}`);
+              const errMsg = err?.message || (typeof err === 'string' ? err : 'Aplikasi tidak dapat menjangkau server MCP. Pastikan Node.js terinstal.');
+              appendTerminalOutput(`[CONTEXT7 ERROR] Gagal terhubung ke library dokumentasi: ${errMsg}`);
             }
           };
           connectContext7();
