@@ -1356,11 +1356,13 @@ Integrations:
          const checkCmd = TauriCommand.create('cmd', ['/C', 'where', binaryName]);
          const out = await checkCmd.execute();
          if (out.code === 0 && out.stdout) {
-            const lines = out.stdout.split('\r\n').filter(l => l.trim());
-            const fullPath = lines[0].trim();
-            finalCommand = `"${fullPath}" ${val.split(' ').slice(1).join(' ')}`;
-            appendOutput(`[AURA INFO] Resolved ${binaryName} to: ${fullPath}`);
-         }
+             const lines = out.stdout.split('\r\n').filter(l => l.trim());
+             // PREFER .cmd or .exe on Windows to avoid sh scripts
+             const preferred = lines.find(l => l.toLowerCase().endsWith('.cmd') || l.toLowerCase().endsWith('.exe')) || lines[0];
+             const fullPath = preferred.trim();
+             finalCommand = `"${fullPath}" ${val.split(' ').slice(1).join(' ')}`;
+             appendOutput(`[AURA INFO] Resolved ${binaryName} to: ${fullPath}`);
+          }
        } catch (e) {}
     }
 
