@@ -1,4 +1,4 @@
-import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
+const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
 
 export interface ProjectMemory {
   projectDescription: string;
@@ -26,9 +26,10 @@ export const memoryManager = {
   },
 
   load: async (projectRoot: string): Promise<ProjectMemory> => {
-    if (!projectRoot) return DEFAULT_MEMORY;
+    if (!projectRoot || !isTauri) return DEFAULT_MEMORY;
     const path = memoryManager.getMemoryPath(projectRoot);
     try {
+      const { readTextFile } = await import('@tauri-apps/plugin-fs');
       const content = await readTextFile(path);
       return JSON.parse(content) as ProjectMemory;
     } catch (err) {
@@ -38,11 +39,12 @@ export const memoryManager = {
   },
 
   save: async (projectRoot: string, memory: ProjectMemory): Promise<void> => {
-    if (!projectRoot) return;
+    if (!projectRoot || !isTauri) return;
     const path = memoryManager.getMemoryPath(projectRoot);
     const dir = `${projectRoot}/.aura`.replace(/\/+/g, '/').replace(/\\+/g, '\\');
     
     try {
+      const { mkdir, writeTextFile } = await import('@tauri-apps/plugin-fs');
       // Ensure .aura directory exists
       await mkdir(dir, { recursive: true });
       await writeTextFile(path, JSON.stringify(memory, null, 2));

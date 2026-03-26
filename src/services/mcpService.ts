@@ -2,7 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
-import { Command, Child } from "@tauri-apps/plugin-shell";
+
+const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
 
 export interface MCPConfig {
   serverUrl: string; // Used for SSE URL or STDIO Command
@@ -12,7 +13,7 @@ export interface MCPConfig {
 }
 
 export class TauriStdioTransport implements Transport {
-  private child?: Child;
+  private child?: any; // any to avoid static type dependency
   private commandStr: string;
   private env?: Record<string, string>;
   private buffer: string = '';
@@ -28,6 +29,9 @@ export class TauriStdioTransport implements Transport {
   }
 
   async start(): Promise<void> {
+    if (!isTauri) throw new Error("Tauri environment not detected");
+
+    const { Command } = await import('@tauri-apps/plugin-shell');
     const isWindows = navigator.platform.toLowerCase().includes('win');
     let cmdName = isWindows ? 'cmd' : 'sh';
     
@@ -54,7 +58,7 @@ export class TauriStdioTransport implements Transport {
       this.onlog?.(`[Process Closed]`);
       this.onclose?.()
     });
-    command.on('error', err => {
+    command.on('error', (err: any) => {
       this.onlog?.(`[Process Error] ${err}`);
       this.onerror?.(new Error(err))
     });
