@@ -1547,8 +1547,10 @@ Integrations:
         activeProcessRef.current = await cmdInstance.spawn();
 
         // If the command hangs before producing any output, kill it to avoid silent failures.
-        // Dev server should normally output initial logs quickly.
-        const firstOutputTimeoutMs = 25000;
+        // However, `npm install` can be slow on cold start (bisa >25 detik tanpa output awal),
+        // sehingga timeout perlu lebih longgar dan dinamis.
+        const firstOutputTimeoutMs =
+          /npm\s+(install|ci)\b/i.test(trimmedVal) ? 120000 : 45000;
         firstOutputTimer = setTimeout(async () => {
           if (!gotFirstOutput && activeProcessRef.current) {
             appendOutput(`[TIMEOUT] Tidak ada output dalam ${Math.round(firstOutputTimeoutMs / 1000)} detik. Proses dihentikan.`);
