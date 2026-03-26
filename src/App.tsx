@@ -103,9 +103,9 @@ import { useLayout } from './hooks/useLayout';
 import { useEditor } from './hooks/useEditor';
 import { useAiChat } from './hooks/useAiChat';
 
-// Windows Installer / Desktop Mode Helpers
-const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
+// Windows Installer / Desktop Mode Helpers - Improved for V2 compat
+const getIsTauri = () => typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+const getIsElectron = () => typeof window !== 'undefined' && !!(window as any).electronAPI;
 
 interface McpTemplateArg {
   key: string;
@@ -312,7 +312,7 @@ export default function App() {
     handleCloneRepo,
     testGithubConnection
   } = useGithub({
-    isTauri,
+    isTauri: getIsTauri() || !!tauriDialog,
     tauriDialog,
     tauriFs,
     appendTerminalOutput,
@@ -330,7 +330,7 @@ export default function App() {
   const handleSaveFile = async () => {
     if (!activeFile) return;
     
-    if (isTauri) {
+    if (getIsTauri() || !!tauriFs) {
       try {
         const { writeTextFile } = await import('@tauri-apps/plugin-fs');
         if (activeFile.path) {
@@ -1239,23 +1239,25 @@ Integrations:
     }
 
     let finalCommand = val;
-    if (isTauri && isWindows && (val.startsWith('npm') || val.startsWith('npx'))) {
+    if ((getIsTauri() || !!TauriCommand) && isWindows && (val.startsWith('npm') || val.startsWith('npx'))) {
        try {
          const binaryName = val.split(' ')[0];
+         // Use full path to binary for better reliability on Windows
          const checkCmd = TauriCommand.create('cmd', ['/C', 'where', binaryName]);
          const out = await checkCmd.execute();
          if (out.code === 0 && out.stdout) {
-             const lines = out.stdout.split('\r\n').filter(l => l.trim());
+             const lines = out.stdout.split(/\r?\n/).filter(l => l.trim());
              // PREFER .cmd or .exe on Windows to avoid sh scripts
              const preferred = lines.find(l => l.toLowerCase().endsWith('.cmd') || l.toLowerCase().endsWith('.exe')) || lines[0];
              const fullPath = preferred.trim();
+             // Important: Don't over-quote here, final wrapping happens in cmd /C
              finalCommand = `"${fullPath}" ${val.split(' ').slice(1).join(' ')}`;
              appendOutput(`[AURA INFO] Resolved ${binaryName} to: ${fullPath}`);
           }
        } catch (e) {}
     }
 
-    if (isTauri && TauriCommand) {
+    if ((getIsTauri() || !!TauriCommand) && TauriCommand) {
       try {
         const normalizedCwd = (nativeProjectPath || '.').replace(/\//g, '\\');
         const shellExe = isWindows ? 'cmd' : 'sh';
@@ -1306,7 +1308,8 @@ Integrations:
 
         let cmdInstance;
         if (isWindows) {
-          cmdInstance = TauriCommand.create('cmd', ['/S', '/C', `"${finalCommand}"`], { cwd: normalizedCwd });
+          // Wrap the entire command string in quotes for /S /C to handle complex paths correctly
+          cmdInstance = TauriCommand.create('cmd', ['/S', '/C', finalCommand], { cwd: normalizedCwd });
         } else {
           cmdInstance = TauriCommand.create('sh', ['-c', finalCommand], { cwd: normalizedCwd });
         }
@@ -1355,7 +1358,10 @@ Integrations:
         });
         activeProcessRef.current = await cmdInstance.spawn();
       } catch (err: any) { appendOutput(`[ERROR] ${err?.message}`); }
-    } else { appendOutput(`[BROWSER MODE] Perintah "${val}" tidak didukung.`); }
+    } else { 
+      appendOutput(`[BROWSER MODE] Perintah "${val}" tidak didukung.`); 
+      appendOutput(`[INFO] Gunakan aplikasi Desktop (.exe) untuk fitur terminal penuh.`);
+    }
   };
 
   const handleTerminalKill = async () => {
@@ -1395,7 +1401,7 @@ Integrations:
               <FolderPlus size={14} /> <span>New Project / Clone</span>
             </div>
             <div className="h-[1px] bg-white/5 my-1 mx-2"></div>
-            <div className="px-3 py-1.5 hover:bg-blue-600 hover:text-white cursor-pointer transition-colors flex items-center gap-2" onClick={isTauri ? openFolderNative : openFolder}>
+            <div className="px-3 py-1.5 hover:bg-blue-600 hover:text-white cursor-pointer transition-colors flex items-center gap-2" onClick={(getIsTauri() || !!tauriDialog) ? openFolderNative : openFolder}>
               <FolderOpen size={14} /> <span>Open Folder...</span>
             </div>
             <div className="px-3 py-1.5 hover:bg-red-500/20 hover:text-red-400 cursor-pointer transition-colors flex items-center gap-2" onClick={closeFolder}>
@@ -1786,7 +1792,7 @@ Integrations:
         repoSearchInput={repoSearchInput}
         setRepoSearchInput={setRepoSearchInput}
         handleCloneRepo={handleCloneRepo}
-        isTauri={isTauri}
+        isTauri={getIsTauri() || !!tauriDialog}
         TauriCommand={TauriCommand}
         openFolderNative={openFolderNative}
         createNewFile={createNewFile}

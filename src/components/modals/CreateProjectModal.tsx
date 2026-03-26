@@ -20,22 +20,29 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   if (!isOpen) return null;
 
   const handleBrowse = async () => {
-    // Deteksi Tauri
-    if (tauriDialog) {
+    // Deteksi Tauri - Gunakan tauriDialog prop yang dioper dari App
+    const runtimeIsTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+    
+    if (tauriDialog || runtimeIsTauri) {
       try {
-        const selected = await tauriDialog.open({
-          directory: true,
-          multiple: false,
-          title: 'Select Destination Folder'
-        });
-        if (selected && typeof selected === 'string') {
-          const normalizedPath = selected.replace(/\\/g, '/');
-          setPath(normalizedPath);
+        // Jika tauriDialog belum di-load tapi runtimeIsTauri benar, kita mungkin perlu menunggu atau 
+        // menggunakan import dinamis, tapi tauriDialog prop harusnya sudah cukup jika di-pass benar.
+        const dialog = tauriDialog || (window as any).__TAURI__?.dialog;
+        if (dialog) {
+          const selected = await dialog.open({
+            directory: true,
+            multiple: false,
+            title: 'Select Destination Folder'
+          });
+          if (selected && typeof selected === 'string') {
+            const normalizedPath = selected.replace(/\\/g, '/');
+            setPath(normalizedPath);
+          }
+          return;
         }
       } catch (err) {
         console.error('Failed to browse folder:', err);
       }
-      return;
     }
 
     // Deteksi Electron
