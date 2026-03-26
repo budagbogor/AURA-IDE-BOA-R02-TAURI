@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Smartphone
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 export const WorkflowDiagram: React.FC = () => {
   const containerVariants = {

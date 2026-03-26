@@ -1,7 +1,7 @@
 import React from 'react';
 import { Folder, ChevronRight, X, FolderOpen, Github, Plus, Globe, RefreshCw, Maximize2 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { cn } from '@/utils/cn';
 import { getFileIcon } from '@/utils/icons';
 import { AuraLogo } from '@/components/layout/AuraLogo';

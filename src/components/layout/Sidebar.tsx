@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/utils/cn';
 import { getFileIcon, getFolderIcon } from '@/utils/icons';
 import Markdown from 'react-markdown';
