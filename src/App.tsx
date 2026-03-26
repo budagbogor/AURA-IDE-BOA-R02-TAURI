@@ -84,7 +84,7 @@ import {
   FREE_MODELS, 
   BYTEZ_MODELS, 
   SUMOPOD_MODELS, 
-  SUPER_CLAUDE_SKILLS, 
+  AURA_COLLECTIVE, 
   SUPER_CLAUDE_COMMANDS, 
   MCP_TEMPLATES 
 } from '@/utils/constants';
@@ -228,6 +228,7 @@ export default function App() {
     isAiLoading, setIsAiLoading,
     attachedFiles, setAttachedFiles,
     selectedSkill, setSelectedSkill,
+    activeAgentId, setActiveAgentId,
     aiRules, setAiRules,
     systemInstruction, setSystemInstruction
   } = useAiChat();
@@ -289,7 +290,9 @@ export default function App() {
     testingStatus,
     setTestingStatus,
     testError,
-    setTestError
+    setTestError,
+    ollamaUrl,
+    setOllamaUrl
   } = useAiManager(appendTerminalOutput);
 
   // syncFilesFromNativePath will be defined later but we need it for useGithub
@@ -443,6 +446,27 @@ export default function App() {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
+  // --- TERMINAL ERROR LISTENER (Self-Healing Phase 8) ---
+  useEffect(() => {
+    const handleTerminalError = (e: any) => {
+      const { message } = e.detail;
+      appendTerminalOutput(`[AURA SELF-HEALING] 🛡️ Mendeteksi kegagalan eksekusi: ${message}`);
+      appendTerminalOutput(`[AURA SELF-HEALING] 🤖 Meminta intervensi AI untuk perbaikan otomatis...`);
+      
+      const fixPrompt = `Terminal error detected: "${message}". Please analyze the current project state and fix the root cause of this error.`;
+      
+      // Trigger AI Composer auto-fix
+      setAutoFixMsg(fixPrompt);
+      setAutoFixTrigger(Date.now());
+      
+      // Switch to AI tab to show progress
+      setShowAiPanel(true);
+    };
+
+    window.addEventListener('terminal-error' as any, handleTerminalError);
+    return () => window.removeEventListener('terminal-error' as any, handleTerminalError);
+  }, [appendTerminalOutput, setAutoFixMsg, setAutoFixTrigger, setShowAiPanel]);
+
   // --- RESTORE TAURI INITIALIZATION (v2.6.6-PRO) ---
   useEffect(() => {
     // Definisi helper deteksi runtime yang sangat ketat
@@ -561,7 +585,7 @@ export default function App() {
 
     // Then use AI for deeper analysis if requested or as a second pass
     try {
-      const currentSkill = SUPER_CLAUDE_SKILLS.find(s => s.name === selectedSkill);
+      const currentSkill = AURA_COLLECTIVE.find(s => s.name === selectedSkill);
       const skillInstruction = currentSkill ? currentSkill.instruction : '';
       
       const prompt = `System Instruction: ${systemInstruction}
@@ -627,6 +651,26 @@ export default function App() {
   const handleSendMessage = async () => {
     if ((!chatInput.trim() && attachedFiles.length === 0) || isAiLoading) return;
 
+    // --- SMART PERSONA ORCHESTRATOR (v8.0.0-Elite) ---
+    const lowerInput = chatInput.toLowerCase();
+    let detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'pm'); // Default Orchestrator
+    
+    if (lowerInput.match(/ui|design|style|css|color|aesthetic|glassmorphism|bento|palette/)) {
+      detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'uiux');
+    } else if (lowerInput.match(/error|debug|bug|crash|fix|troubleshoot|rca|failed/)) {
+      detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'debugger');
+    } else if (lowerInput.match(/architect|structure|solid|pattern|scalability|design pattern/)) {
+      detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'architect');
+    } else if (lowerInput.match(/security|vulnerability|auth|encrypt|audit|leak/)) {
+      detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'security');
+    }
+
+    if (detectedAgent && detectedAgent.name !== selectedSkill) {
+      setSelectedSkill(detectedAgent.name);
+      setActiveAgentId(detectedAgent.id);
+      appendTerminalOutput(`[AURA SWARM] Switching to ${detectedAgent.name} for this task...`);
+    }
+
     const userMsg: ChatMessage = { role: 'user', content: chatInput };
     setChatMessages(prev => [...prev, userMsg]);
     setChatInput('');
@@ -634,7 +678,7 @@ export default function App() {
 
     try {
       let content = '';
-      const currentSkill = SUPER_CLAUDE_SKILLS.find(s => s.name === selectedSkill);
+      const currentSkill = AURA_COLLECTIVE.find(s => s.name === (detectedAgent?.name || selectedSkill));
       const skillInstruction = currentSkill ? currentSkill.instruction : '';
       
       // Check for commands in input
@@ -1812,6 +1856,18 @@ Integrations:
         testGithubConnection={testGithubConnection}
         testError={testError}
         nativeProjectPath={nativeProjectPath}
+        ollamaUrl={ollamaUrl}
+        setOllamaUrl={setOllamaUrl}
+        problems={problems}
+        onFocusProblem={(p: any) => {
+          const file = files.find(f => f.path === p.path || f.name === p.file);
+          if (file) {
+            setActiveFileId(file.id);
+            setBottomTab('problems');
+          }
+        }}
+        activeAgentId={activeAgentId}
+        setActiveAgentId={setActiveAgentId}
       />
 
       {/* Main Area */}
@@ -1885,6 +1941,18 @@ Integrations:
             onAcceptStaging={handleAcceptStaging}
             onDiscardStaging={handleDiscardStaging}
             onUpdateStagingStatus={handleUpdateStagingStatus}
+            onAiAction={(action: 'fix' | 'explain' | 'refactor') => {
+              setShowAiPanel(true);
+              const file = files.find(f => f.id === activeFileId);
+              if (!file) return;
+              
+              let prompt = '';
+              if (action === 'fix') prompt = `Analisis file ${file.name} dan perbaiki error atau bug yang ditemukan secara otonom.`;
+              else if (action === 'explain') prompt = `Berikan penjelasan mendalam (Architecture Review) tentang file ${file.name}.`;
+              else if (action === 'refactor') prompt = `Sarankan dan terapkan refactoring pada file ${file.name} agar lebih clean dan efisien.`;
+              
+              setComposerMessages(prev => [...prev, { role: 'user', content: prompt }]);
+            }}
           />
         </div>
       </div>
@@ -1981,6 +2049,9 @@ Integrations:
               onExecuteCommand={executeCommand}
               onApplyCode={handleApplyCode}
               nativeProjectPath={nativeProjectPath}
+              mcpTools={mcpServers.filter(s => s.connected).flatMap(s => s.tools || [])}
+              ollamaUrl={ollamaUrl}
+              activeAgentId={activeAgentId}
             />
           </div>
         </div>

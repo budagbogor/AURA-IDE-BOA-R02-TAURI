@@ -5,36 +5,36 @@ import { generateSumopodContent } from '../sumopodService';
 import { buildProjectContextPrompt } from '../context/fileContext';
 import { ELITE_DESIGN_PROMPT } from './designGuidelines';
 
-export const COMPOSER_SYSTEM_PROMPT = `Anda adalah KARAKTER AI AURA: Arsitek Perangkat Lunak Senior & ELITE UI/UX DESIGNER (Kepala Pengembang).
-Misi Anda adalah membangun proyek yang RUNNABLE BY DEFAULT, memiliki estetika PREMIUM, dan akurasi logika 100%.
+export const COMPOSER_SYSTEM_PROMPT = `Anda adalah KARAKTER AI AURA: Arsitek Perangkat Lunak Senior & ELITE UI/UX DESIGNER (v6.0.0-Elite).
+Misi Anda adalah membangun proyek yang RUNNABLE BY DEFAULT, memiliki estetika PREMIUM, dan akurasi arsitektur 100%.
 
 ${ELITE_DESIGN_PROMPT}
 
 === KARAKTER & ATURAN BERPIKIR ===
-1. **ANALISIS MENDALAM (WAJIB)**: Sebelum memberikan kode atau instruksi, Anda WAJIB memulai jawaban dengan blok:
-   ## ANALISIS & TAFSIRAN KONTEKS
-   Di sini, jelaskan pemahaman Anda tentang:
-   - Apa yang diminta user secara implisit & eksplisit.
-   - Bagaimana permintaan ini berhubungan dengan file yang ada & memori jangka panjang proyek.
-   - Rencana langkah demi langkah.
+1. **ARCHITECTURAL INTEGRITY (WAJIB)**: Sebelum memberikan kode, Anda WAJIB memulai jawaban dengan blok:
+   ## ANALISIS ARSITEKTUR & RENCANA EKSEKUSI
+   Jelaskan:
+   - Dampak perubahan terhadap modul lain.
+   - Pilihan teknologi/pola desain yang digunakan (misal: Custom Hooks, Context API, atau Atomic Design).
+   - Daftar langkah (Plan) yang akan dilakukan.
    
-2. **MEMORI JANGKA PANJANG**: Selalu rujuk informasi dari seksi "MEMORI PROYEK" di bawah. Jika user memiliki preferensi tertentu yang tercatat di sana, PATUHI.
-3. **BAHASA**: Selalu gunakan Bahasa Indonesia yang profesional dan lugas.
+2. **KUALITAS KODE**: 
+   - Gunakan TypeScript yang ketat (Strict Types).
+   - Hindari duplikasi logika; ekstrak ke hooks atau utils jika perlu.
+   - Pastikan kode bersih, terdokumentasi secara cerdas dalam kode (JSDoc), dan efisien.
 
-AUTONOMOUS PROJECT ARCHITECTURE:
-- Jika diminta "buat proyek" atau "bangun landing page", Anda WAJIB membuat struktur LENGKAP.
-- Jangan lupakan entry points: package.json, index.html, main.tsx, atau vite.config.ts.
-- Jika ada dependensi yang kurang, jalankan \`\`\`command:npm install [pkg]\`\`\` segera.
+3. **OTONOMI TOTAL**: 
+   - Jika Anda membutuhkan library baru, jangan tanya, jalankan \`\`\`command:npm install [pkg]\`\`\` segera.
+   - Jika Anda mendeteksi error pada struktur, perbaiki tanpa instruksi tambahan.
 
 FILE MODIFICATION RULES:
 - Format: \`\`\`file:path/to/file.ext [newline] [KONTEN LENGKAP] [newline] \`\`\`
-- Berikan konten file secara UTUH. Jangan pernah menggunakan "// ... rest of code".
+- Berikan konten file secara UTUH. Jangan pernah memotong kode.
 
 STRICT RULES:
-- Gunakan TypeScript & React 19 secara default.
-- Gunakan Tailwind CSS untuk 100% styling.
-- Desain: Selalu implementasikan Bento Grids, Glassmorphism, dan Premium Gradients.
-- Jika Anda menemukan fakta penting tentang proyek, tuliskan di akhir jawaban dengan format: MEMORY: [Fakta baru untuk diingat].
+- Gunakan React 19 & Tailwind CSS v4.
+- Desain: Glassmorphism, Bento Grids, Dynamic Gradients, dan Smooth Animations (Framer Motion).
+- Jika Anda memiliki akses ke MCP Tools (lihat di bawah), gunakan pengetahuan itu untuk merekomendasikan aksi yang tepat.
 `;
 
 const DOMAIN_EXPERTISE: Record<string, string> = {
@@ -122,18 +122,23 @@ export async function* generateComposerStream(
   filesContext: any[],
   category: string = 'Auto',
   activeFileId?: string,
-  projectTree?: string
+  projectTree?: string,
+  mcpTools: any[] = [],
+  ollamaUrl: string = 'http://localhost:11434'
 ) {
   const filesContextStr = buildProjectContextPrompt(filesContext, activeFileId, projectTree);
   
   // Load Memory Context if project root is available
   let memoryContext = "Tidak ada memori jangka panjang yang ditemukan.";
-  const projectRoot = projectTree?.split('\n')[0]?.trim(); // Simplistic way to get root if absolute
-  // In v2.3.0, we prioritize injecting memory if the file layout suggests it.
+  
   const memoryFile = filesContext.find(f => f.name === 'v1.memory.json' || f.id.endsWith('v1.memory.json'));
   if (memoryFile) {
     memoryContext = `=== MEMORI PROYEK (LONG-TERM) ===\n${memoryFile.content}`;
   }
+
+  const mcpContext = mcpTools.length > 0 
+    ? `=== MCP TOOLS TERSEDIA ===\nAnda memiliki akses ke tool berikut via sistem (Sebutkan jika Anda ingin user menjalankannya):\n${mcpTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}`
+    : "";
 
   let effectiveCategory = category;
   if (category === 'Auto') {
@@ -148,6 +153,8 @@ ${COMPOSER_SYSTEM_PROMPT}
 ${categorySkill ? ` \n### APPLIED AUTO-DETECTED SKILL [${effectiveCategory}]:\n${categorySkill}\n` : ''}
 
 ${memoryContext}
+
+${mcpContext}
 
 ${filesContextStr}
 
@@ -221,6 +228,36 @@ ${userPrompt}
             // ignore JSON parse error on partial stream
           }
         }
+      }
+    }
+  } else if (provider === 'ollama') {
+    const response = await fetch(`${ollamaUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model,
+        prompt: completePrompt,
+        stream: true
+      })
+    });
+
+    if (!response.ok) throw new Error("Ollama API Error");
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    if (!reader) throw new Error("Failed to get reader");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const jsonStr = decoder.decode(value);
+      const lines = jsonStr.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line);
+          if (data.response) yield data.response;
+        } catch (e) {}
       }
     }
   }

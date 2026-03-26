@@ -15,9 +15,10 @@ export const useAiChat = () => {
   const [chatInput, setChatInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; data: string; content?: string }[]>([]);
-  const [selectedSkill, setSelectedSkill] = useState('Super Claude');
+  const [selectedSkill, setSelectedSkill] = useState('Aura Orchestrator');
+  const [activeAgentId, setActiveAgentId] = useState('pm');
   const [aiRules, setAiRules] = useState(() => localStorage.getItem('aura_ai_rules') || '');
-  const [systemInstruction, setSystemInstruction] = useState(() => localStorage.getItem('aura_system_instruction') || 'You are Aura, a powerful AI assistant focused on high-quality code generation and problem-solving.');
+  const [systemInstruction, setSystemInstruction] = useState(() => localStorage.getItem('aura_system_instruction') || 'You are Aura, the Lead Orchestrator of the AURA Collective. Coordinate between specialized agents and ensure high-quality, verified results.');
 
   useEffect(() => {
     localStorage.setItem('aura_ai_rules', aiRules);
@@ -34,6 +35,7 @@ export const useAiChat = () => {
     isAiLoading, setIsAiLoading,
     attachedFiles, setAttachedFiles,
     selectedSkill, setSelectedSkill,
+    activeAgentId, setActiveAgentId,
     aiRules, setAiRules,
     systemInstruction, setSystemInstruction
   };

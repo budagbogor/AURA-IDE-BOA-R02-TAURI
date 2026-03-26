@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export type SidebarTab = 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database';
+export type SidebarTab = 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database' | 'auditor';
 export type BottomTab = 'terminal' | 'problems' | 'output' | 'debug';
 export type LayoutMode = 'classic' | 'modern';
 

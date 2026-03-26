@@ -82,6 +82,16 @@ export const memoryManager = {
       }
     }
 
+    // Capture User Preferences
+    const prefRegex = /USER_PREFERENCE:\s*(.+)/g;
+    while ((match = prefRegex.exec(aiResponse)) !== null) {
+      const pref = match[1].trim();
+      if (!memory.userPreferences.includes(pref)) {
+        memory.userPreferences.push(pref);
+        newFactsFound = true;
+      }
+    }
+
     if (newFactsFound) {
       // Keep only last 50 facts to prevent prompt bloat
       if (memory.learnedFacts.length > 50) memory.learnedFacts = memory.learnedFacts.slice(-50);

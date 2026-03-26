@@ -6,6 +6,7 @@ import { memoryManager } from '../../services/ai/memoryManager';
 import { FileItem } from '../../types';
 import { Send, Bot, User, RefreshCw, Cpu, Loader2, Globe, Sparkles, FileCode } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { AURA_COLLECTIVE } from '../../utils/constants';
 import Markdown from 'react-markdown';
 
 interface AiComposerPanelProps {
@@ -24,6 +25,9 @@ interface AiComposerPanelProps {
   autoFixTrigger?: number;
   autoFixMessage?: string;
   nativeProjectPath?: string | null;
+  mcpTools?: any[];
+  ollamaUrl?: string;
+  activeAgentId?: string;
 }
 
 interface Message {
@@ -47,7 +51,10 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
   setMessages,
   autoFixTrigger,
   autoFixMessage,
-  nativeProjectPath
+  nativeProjectPath,
+  mcpTools = [],
+  ollamaUrl = 'http://localhost:11434',
+  activeAgentId = 'pm'
 }) => {
   const [input, setInput] = useState('');
   const [category, setCategory] = useState('Auto');
@@ -85,7 +92,7 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
     try {
       if (appendTerminalOutput) appendTerminalOutput(`[AI] Menyusun rencana untuk: ${userMessage.substring(0, 30)}...`);
       
-      const stream = generateComposerStream(provider, apiKey, model, userMessage, files, category, activeFileId, projectTree);
+      const stream = generateComposerStream(provider, apiKey, model, userMessage, files, category, activeFileId, projectTree, mcpTools, ollamaUrl);
       
       let fullResponse = '';
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
@@ -225,8 +232,13 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="w-6 h-6 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.2)]"><Bot size={12} /></div>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 italic">Aura AI</span>
+                  <div className="w-6 h-6 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+                    <Bot size={12} />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 italic flex items-center gap-1">
+                    Aura AI 
+                    <span className="opacity-40 text-[8px]">— {AURA_COLLECTIVE.find(a => a.id === activeAgentId)?.name || 'Orchestrator'}</span>
+                  </span>
                 </>
               )}
             </div>

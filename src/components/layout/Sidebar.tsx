@@ -10,20 +10,22 @@ import {
   Eye, FolderOpen, Download, Terminal, Plus,
   FolderTree, RefreshCw, Bot, User, ImageIcon, FileIcon, Paperclip, Send,
   Cpu, ExternalLink, CheckCircle, AlertTriangle, Play, ChevronDown, Database,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  ShieldCheck
 } from 'lucide-react';
+import { AuraAuditorPanel } from '@/components/features/AuraAuditorPanel';
 import { FileItem, ChatMessage, CodeProblem, McpServer, TerminalSession } from '@/types';
 import { 
   FREE_MODELS, BYTEZ_MODELS, SUMOPOD_MODELS, GEMINI_MODELS,
-  SUPER_CLAUDE_SKILLS, SUPER_CLAUDE_COMMANDS, MCP_TEMPLATES 
+  AURA_COLLECTIVE, SUPER_CLAUDE_COMMANDS, MCP_TEMPLATES 
 } from '@/utils/constants';
 import { AiComposerPanel } from '../AiComposer/AiComposerPanel';
 
 interface SidebarProps {
   layoutMode: 'classic' | 'modern';
   zenMode: boolean;
-  sidebarTab: 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database';
-  setSidebarTab: (tab: 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database') => void;
+  sidebarTab: 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database' | 'auditor';
+  setSidebarTab: (tab: 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database' | 'auditor') => void;
   sidebarWidth: number;
   setSidebarWidth: (width: number) => void;
   isResizingSidebar: boolean;
@@ -78,8 +80,8 @@ interface SidebarProps {
   relayout: (preset: 'default' | 'zen') => void;
   setLayoutMode: (mode: 'classic' | 'modern') => void;
   setZenMode: (mode: boolean) => void;
-  aiProvider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod';
-  setAiProvider: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod') => void;
+  aiProvider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama';
+  setAiProvider: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama') => void;
   geminiApiKey: string;
   setGeminiApiKey: (key: string) => void;
   selectedModel: string;
@@ -126,11 +128,17 @@ interface SidebarProps {
   activeMcpLogs: string[];
   setActiveMcpLogs: (logs: string[]) => void;
   testingStatus: Record<string, 'idle' | 'loading' | 'success' | 'error'>;
-  testAiConnection: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod') => Promise<void>;
+  testAiConnection: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama') => Promise<void>;
   testGithubConnection: () => Promise<void>;
   resetAllConnections: () => void;
   testError: Record<string, string>;
   nativeProjectPath: string | null;
+  ollamaUrl: string;
+  setOllamaUrl: (url: string) => void;
+  problems: CodeProblem[];
+  onFocusProblem: (p: CodeProblem) => void;
+  activeAgentId: string;
+  setActiveAgentId: (id: string) => void;
 }
 
 type FileTreeItem = {
@@ -281,7 +289,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   showMcpLogsFor, setShowMcpLogsFor, activeMcpLogs, setActiveMcpLogs,
   testingStatus, testAiConnection,
   testGithubConnection, testError,
-  nativeProjectPath
+  nativeProjectPath,
+  ollamaUrl, setOllamaUrl,
+  problems, onFocusProblem,
+  activeAgentId, setActiveAgentId
 }) => {
 
   const ConnectionStatus: React.FC<{ 
@@ -389,6 +400,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Settings size={20} className={cn("transition-transform duration-200", sidebarTab === 'settings' && "scale-110")} />
             {sidebarTab === 'settings' && <motion.div layoutId="activeTab" className="absolute left-[-12px] w-1 h-8 bg-blue-500 rounded-r-full" />}
           </div>
+          {sidebarTab === 'auditor' && (
+            <AuraAuditorPanel 
+              problems={problems}
+              projectName="AURA-PROJECT"
+              files={files}
+              onFocusProblem={onFocusProblem}
+            />
+          )}
         </div>
       </div>
 
@@ -740,6 +759,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <option value="openrouter">OpenRouter</option>
                           <option value="bytez">Bytez AI</option>
                           <option value="sumopod">SumoPod</option>
+                          <option value="ollama">Ollama (Local)</option>
                         </select>
                         <select 
                           value={aiProvider === 'gemini' ? selectedModel : aiProvider === 'openrouter' ? openRouterModel : aiProvider === 'bytez' ? bytezModel : sumopodModel}
@@ -763,6 +783,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {aiProvider === 'sumopod' && SUMOPOD_MODELS.map(m => (
                             <option key={m.id} value={m.id}>{m.name}</option>
                           ))}
+                          {aiProvider === 'ollama' && (
+                            <>
+                              <option value="llama3">Llama 3</option>
+                              <option value="mistral">Mistral</option>
+                              <option value="codellama">CodeLlama</option>
+                              <option value="deepseek-coder">DeepSeek Coder</option>
+                              <option value="qwen2.5-coder">Qwen 2.5 Coder</option>
+                            </>
+                          )}
                         </select>
                       </div>
                       <ConnectionStatus 
@@ -774,21 +803,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-bold text-gray-500 uppercase">API Key Authorization</label>
-                      <input 
-                        type="password" 
-                        placeholder={aiProvider === 'gemini' ? "Gemini Key..." : aiProvider === 'openrouter' ? "Token..." : aiProvider === 'bytez' ? "Bytez Key..." : "SumoPod Key..."}
-                        value={aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'openrouter' ? openRouterApiKey : aiProvider === 'bytez' ? bytezApiKey : sumopodApiKey}
-                        onChange={(e) => {
-                          if (aiProvider === 'gemini') setGeminiApiKey(e.target.value);
-                          else if (aiProvider === 'openrouter') setOpenRouterApiKey(e.target.value);
-                          else if (aiProvider === 'bytez') setBytezApiKey(e.target.value);
-                          else setSumopodApiKey(e.target.value);
-                        }}
-                        className="w-full bg-[#3c3c3c] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none text-white focus:border-purple-500/50"
-                      />
+                        <input 
+                          type="password" 
+                          placeholder={aiProvider === 'gemini' ? "Gemini Key..." : aiProvider === 'openrouter' ? "Token..." : aiProvider === 'bytez' ? "Bytez Key..." : "SumoPod Key..."}
+                          value={aiProvider === 'gemini' ? geminiApiKey : aiProvider === 'openrouter' ? openRouterApiKey : aiProvider === 'bytez' ? bytezApiKey : sumopodApiKey}
+                          onChange={(e) => {
+                            if (aiProvider === 'gemini') setGeminiApiKey(e.target.value);
+                            else if (aiProvider === 'openrouter') setOpenRouterApiKey(e.target.value);
+                            else if (aiProvider === 'bytez') setBytezApiKey(e.target.value);
+                            else if (aiProvider === 'sumopod') setSumopodApiKey(e.target.value);
+                          }}
+                          className={cn(
+                            "w-full bg-[#3c3c3c] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none text-white focus:border-purple-500/50 transition-all",
+                            aiProvider === 'ollama' && "opacity-20 pointer-events-none filter blur-[2px]"
+                          )}
+                        />
+                        {aiProvider === 'ollama' && (
+                          <div className="space-y-1.5 mt-2 p-2 bg-blue-500/5 border border-blue-500/10 rounded-lg">
+                            <label className="text-[9px] font-bold text-blue-400 uppercase">Ollama Server URL</label>
+                            <input 
+                              type="text" 
+                              placeholder="http://localhost:11434"
+                              value={ollamaUrl}
+                              onChange={(e) => setOllamaUrl(e.target.value)}
+                              className="w-full bg-[#3c3c3c]/50 border border-blue-500/20 rounded px-2 py-1 text-[11px] outline-none text-white focus:border-blue-500/50"
+                            />
+                          </div>
+                        )}
                     </div>
                   </div>
 
+                </section>
+
+                {/* AURA COLLECTIVE PERSONAS (v8.0.0) */}
+                <section className="space-y-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2 italic">
+                    <Bot size={12} /> Aura Collective Swarm
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {AURA_COLLECTIVE.map(agent => (
+                      <div key={agent.id} className="p-2 border border-white/5 bg-white/5 rounded-xl hover:border-blue-500/30 transition-all group">
+                         <div className="flex items-center gap-2 mb-1">
+                            <div className="p-1 rounded bg-blue-500/10 text-blue-400">
+                               <Cpu size={12} />
+                            </div>
+                            <span className="text-[11px] font-bold text-gray-200">{agent.name}</span>
+                         </div>
+                         <p className="text-[9px] text-gray-500 leading-tight italic">{agent.description}</p>
+                      </div>
+                    ))}
+                  </div>
                 </section>
 
                 {/* Integrations Section */}

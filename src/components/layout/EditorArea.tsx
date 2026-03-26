@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, ChevronRight, X, FolderOpen, Github, Plus, Globe, RefreshCw, Maximize2 } from 'lucide-react';
+import { Folder, ChevronRight, X, FolderOpen, Github, Plus, Globe, RefreshCw, Maximize2, Bot, Zap, Sparkles, MessageSquare } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { motion } from 'motion/react';
 import { cn } from '@/utils/cn';
@@ -36,6 +36,7 @@ interface EditorAreaProps {
   onAcceptStaging: () => void;
   onDiscardStaging: () => void;
   onUpdateStagingStatus: (path: string, status: 'accepted' | 'rejected') => void;
+  onAiAction?: (action: 'fix' | 'explain' | 'refactor') => void;
 }
 
 export const EditorArea: React.FC<EditorAreaProps> = ({
@@ -56,7 +57,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   stagingFiles,
   onAcceptStaging,
   onDiscardStaging,
-  onUpdateStagingStatus
+  onUpdateStagingStatus,
+  onAiAction
 }) => {
   return (
     <div className="flex-1 flex min-h-0 relative">
@@ -186,6 +188,40 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                 guides: { bracketPairs: true, indentation: true },
               }}
             />
+
+            {/* AI Action Bar - v7.0.0 Elite */}
+            <div className="absolute top-12 right-12 z-20 flex flex-col gap-2 pointer-events-none">
+               <motion.div 
+                 initial={{ opacity: 0, x: 20 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 className="flex flex-col gap-2 p-1.5 bg-[#252526]/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl pointer-events-auto"
+               >
+                  <button 
+                    onClick={() => onAiAction?.('fix')}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-blue-600/20 text-blue-400 rounded-xl transition-all group"
+                    title="Aura Quick Fix"
+                  >
+                    <Zap size={14} className="group-hover:scale-125 transition-transform" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Quick Fix</span>
+                  </button>
+                  <button 
+                    onClick={() => onAiAction?.('explain')}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-emerald-600/20 text-emerald-400 rounded-xl transition-all group"
+                    title="Aura Explain"
+                  >
+                    <MessageSquare size={14} className="group-hover:scale-125 transition-transform" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Explain</span>
+                  </button>
+                  <button 
+                    onClick={() => onAiAction?.('refactor')}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-purple-600/20 text-purple-400 rounded-xl transition-all group"
+                    title="Aura Refactor"
+                  >
+                    <Sparkles size={14} className="group-hover:scale-125 transition-transform" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Refactor</span>
+                  </button>
+               </motion.div>
+            </div>
           </div>
         </div>
       )}

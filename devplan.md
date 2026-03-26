@@ -29,3 +29,20 @@ Dokumen ini mendeskripsikan peta jalan (*roadmap*) pengembangan untuk mencapai v
 - [x] Optimasi Layout: DEFAULT LOOK & ZEN ONLY modes.
 - [x] Sinkronisasi Dokumentasi & Keyboard Shortcuts.
 - [x] Final Build & Release Ready.
+
+## Phase 6: Core Intelligence & Contextual Precision (v6.0.0-Elite) [DONE]
+- [x] Implementasi Smart Context Orchestrator (RAG-lite).
+- [x] Autonomous Multi-Step Refinement & Error Recovery.
+- [x] Ekspansi Elite Design System (EDS) Guidelines.
+- [x] Structured Long-Term Memory (SLTM) V1.
+
+## Phase 7: Collaborative Autonomy & Intelligence Suite (v7.0.0-Elite) [DONE]
+- [x] AI Code Lens: Quick Action Buttons in Editor.
+- [x] Autonomous Code Auditor: Overall Project Health Scan.
+- [x] Local LLM Gateway: Ollama & LM Studio Integration.
+- [x] Aura Collective: Expert Persona System Enhancement.
+
+## Phase 8: Multi-Agent Orchestration & Self-Healing (v8.0.0-Future)
+- [ ] Swarm Intelligence: Koordinasi antar AI Agent untuk tugas kompleks.
+- [ ] Auto-Debug & Self-Healing: AI memperbaiki kodenya sendiri saat runtime error.
+- [ ] Predictive Coding: AI memberikan saran sebelum user mengetik berdasarkan pola proyek.

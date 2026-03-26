@@ -13,7 +13,8 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
   const [testingStatus, setTestingStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [testError, setTestError] = useState<Record<string, string>>({});
   
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'openrouter' | 'bytez' | 'sumopod'>(() => (localStorage.getItem('aiProvider') as any) || 'gemini');
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama'>(() => (localStorage.getItem('aiProvider') as any) || 'gemini');
+  const [ollamaUrl, setOllamaUrl] = useState(() => localStorage.getItem('aura_ollama_url') || 'http://localhost:11434');
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('aura_gemini_key') || '');
   const [openRouterApiKey, setOpenRouterApiKey] = useState(() => localStorage.getItem('aura_openrouter_key') || '');
   const [bytezApiKey, setBytezApiKey] = useState(() => localStorage.getItem('aura_bytez_key') || '');
@@ -35,7 +36,8 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
     localStorage.setItem('sumopodApiKey', sumopodApiKey);
     localStorage.setItem('sumopodModel', sumopodModel);
     localStorage.setItem('aiProvider', aiProvider);
-  }, [geminiApiKey, openRouterApiKey, bytezApiKey, bytezModel, sumopodApiKey, sumopodModel, aiProvider]);
+    localStorage.setItem('aura_ollama_url', ollamaUrl);
+  }, [geminiApiKey, openRouterApiKey, bytezApiKey, bytezModel, sumopodApiKey, sumopodModel, aiProvider, ollamaUrl]);
 
   const refreshModels = async () => {
     if (aiProvider === 'openrouter') {
@@ -76,6 +78,9 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
         const apiKey = sumopodApiKey || '';
         if (!apiKey) throw new Error('API Key kosong');
         await generateSumopodContent(apiKey, sumopodModel, [{ role: 'user', content: 'ping' }]);
+      } else if (provider === 'ollama') {
+        const res = await fetch(`${ollamaUrl}/api/tags`);
+        if (!res.ok) throw new Error('Gagal terhubung ke Ollama. Pastikan Ollama aktif di ' + ollamaUrl);
       }
       setTestingStatus((prev: any) => ({ ...prev, [provider]: 'success' }));
       appendTerminalOutput(`[AI] Koneksi ${provider.toUpperCase()} berhasil!`);
@@ -105,6 +110,8 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
     testingStatus,
     setTestingStatus,
     testError,
-    setTestError
+    setTestError,
+    ollamaUrl,
+    setOllamaUrl
   };
 };
