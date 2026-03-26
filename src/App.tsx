@@ -1415,7 +1415,10 @@ Integrations:
 
         let cmdInstance;
         if (isWindows) {
-          cmdInstance = TauriCommand.create('cmd', ['/S', '/C', `"${finalCommand}"`], { cwd: normalizedCwd });
+          // Important: avoid double-quoting `finalCommand`.
+          // When we resolve `npm`/`npx` to `"C:\\Program Files\\nodejs\\npm.cmd" ...`,
+          // wrapping the whole command again as `"${finalCommand}"` can break cmd parsing.
+          cmdInstance = TauriCommand.create('cmd', ['/S', '/C', finalCommand], { cwd: normalizedCwd });
         } else {
           cmdInstance = TauriCommand.create('sh', ['-c', finalCommand], { cwd: normalizedCwd });
         }
