@@ -443,31 +443,44 @@ export default function App() {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  /* --- TEMPORARILY DISABLED TAURI INIT TO FIX BLANK SCREEN (v2.6.4-PRO) ---
+  // --- RESTORE TAURI INITIALIZATION (v2.6.5-PRO) ---
   useEffect(() => {
+    // Definisi helper deteksi runtime yang lebih ketat
     const runtimeIsTauri = typeof window !== 'undefined' && 
                          !!(window as any).__TAURI_INTERNALS__;
 
     if (runtimeIsTauri) {
       const initTauri = async () => {
+        // Small delay to ensure Tauri internals are fully injected
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         try {
-          const { Command } = await import('@tauri-apps/plugin-shell');
-          const dialog = await import('@tauri-apps/plugin-dialog');
-          const fs = await import('@tauri-apps/plugin-fs');
+          // Initialize plugins individually for better stability
+          console.log('[DEBUG] Initializing Tauri Desktop Plugins...');
           
-          if (Command) setTauriCommand(Command);
-          if (dialog) setTauriDialog(dialog);
-          if (fs) setTauriFs(fs);
-          
+          try {
+            const { Command } = await import('@tauri-apps/plugin-shell');
+            if (Command) setTauriCommand(Command);
+          } catch (e) { console.error('Tauri Shell Plugin Fail:', e); }
+
+          try {
+            const dialog = await import('@tauri-apps/plugin-dialog');
+            if (dialog) setTauriDialog(dialog);
+          } catch (e) { console.error('Tauri Dialog Plugin Fail:', e); }
+
+          try {
+            const fs = await import('@tauri-apps/plugin-fs');
+            if (fs) setTauriFs(fs);
+          } catch (e) { console.error('Tauri FS Plugin Fail:', e); }
+
           appendTerminalOutput('[SYSTEM] Tauri Desktop Engine Initialized.');
         } catch (err: any) {
-          console.error('CRITICAL: Tauri Plugin Load Failed:', err);
+          console.error('CRITICAL: General Tauri Init Failure:', err);
         }
       };
       initTauri();
     }
   }, [setTauriCommand, setTauriDialog, setTauriFs]);
-  */
 
 
 
@@ -1478,7 +1491,7 @@ Integrations:
             </div>
             <div className="h-[1px] bg-white/5 my-1 mx-2"></div>
             <div className="px-3 py-1.5 flex items-center gap-2 text-white/40 cursor-default">
-              <Info size={14} /> <span className="text-[10px]">AURA AI IDE v2.6.4-PRO</span>
+              <Info size={14} /> <span className="text-[10px]">AURA AI IDE v2.6.5-PRO</span>
             </div>
           </div>
         </div>
