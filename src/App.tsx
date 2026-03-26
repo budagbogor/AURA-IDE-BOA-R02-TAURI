@@ -1333,7 +1333,9 @@ Integrations:
     const trimmedVal = val.trim();
     const isNpm = trimmedVal.startsWith('npm');
 
-    if (trimmedVal === 'npm install' || trimmedVal === 'npm i') {
+    // Auto-create package.json for npm install flows (including extra flags),
+    // so "npm install --no-bin-links" can still work in terminal.
+    if (/^npm\s+(install|i)\b/i.test(trimmedVal)) {
        const hasPackageJson = files.some(f => f.name === 'package.json');
        if (!hasPackageJson) {
           appendOutput(`[SYSTEM] ⚠️ WARNING: 'package.json' tidak ditemukan.`);
@@ -1368,6 +1370,66 @@ Integrations:
       try {
         const normalizedCwd = (nativeProjectPath || '.').replace(/\//g, '\\');
         const shellExe = isWindows ? 'cmd' : 'sh';
+
+        // Security guardrail: block common destructive commands unless user explicitly confirms.
+        // Usage: append `--yes` to allow. (Example: `rm -rf . --yes`)
+        const valLower = trimmedVal.toLowerCase();
+        const destructivePatterns: RegExp[] = [
+          /\brm\s+-rf\b/i,
+          /\brmdir\s+\/s\b/i,
+          /\bdel(\s+|\.|$)/i,
+          /\bremove-item\b/i,
+          /\bnpm\s+audit\s+fix\s+--force\b/i,
+          /\bnpm\s+install\s+--force\b/i,
+          /\bnpm\s+ci\s+--force\b/i,
+        ];
+        const isDestructive = destructivePatterns.some(r => r.test(valLower));
+        const hasUserConfirm = valLower.includes('--yes') || valLower.includes(' -y') || valLower.endsWith(' -y') || valLower.includes(' -y ');
+        if (isDestructive && !hasUserConfirm) {
+          appendOutput('[SECURITY] Perintah terdeteksi berpotensi destruktif. Ditolak untuk keamanan. Tambahkan `--yes` untuk mengizinkan.');
+          return;
+        }
+
+        // Preflight for node/npm-related commands (prevents noisy failures).
+        const looksLikeNodeTool = /^(npm|npx|node)\b/i.test(trimmedVal);
+        if (looksLikeNodeTool) {
+          if (!nativeProjectPath || normalizedCwd === '.') {
+            appendOutput('[PRECHECK] CWD belum ter-set ke folder project. Buka folder native dulu agar perintah npm/node berjalan benar.');
+            return;
+          }
+
+          const hasPackageJson = files.some(f => f.name === 'package.json');
+          const isNpmInstallCommand = /^npm\s+(install|i)\b/i.test(trimmedVal);
+          const likelyNeedsPackageJson =
+            /^npm\s+(run|install|ci|audit)\b/i.test(trimmedVal) ||
+            /^npx\s+/i.test(trimmedVal);
+
+          // NOTE: `files` state bisa belum ter-update setelah `handleApplyCode`.
+          // Jika command-nya memang `npm install`/`npm i`, kita izinkan proses lanjut.
+          if (likelyNeedsPackageJson && !hasPackageJson && !isNpmInstallCommand) {
+            appendOutput('[PRECHECK] `package.json` tidak ditemukan di project ini. Jalankan `npm install` dulu, atau buat `package.json`.');
+            return;
+          }
+
+          try {
+            const nodeCheck = isWindows
+              ? await TauriCommand.create('cmd', ['/C', 'node', '-v']).execute()
+              : await TauriCommand.create('sh', ['-c', 'node -v']).execute();
+
+            const needsNpm = /^npm\b/i.test(trimmedVal) || /^npx\b/i.test(trimmedVal);
+            if (needsNpm) {
+              const npmCheck = isWindows
+                ? await TauriCommand.create('cmd', ['/C', 'npm', '-v']).execute()
+                : await TauriCommand.create('sh', ['-c', 'npm -v']).execute();
+              appendOutput(`[PRECHECK] Node: ${String(nodeCheck.stdout || '').trim() || '(ok)'} | NPM: ${String(npmCheck.stdout || '').trim() || '(ok)'}`);
+            } else {
+              appendOutput(`[PRECHECK] Node: ${String(nodeCheck.stdout || '').trim() || '(ok)'}`);
+            }
+          } catch (e: any) {
+            appendOutput('[PRECHECK] Node.js/npm tidak terdeteksi di OS ini. Terminal tidak bisa menjalankan `npm`/`node`. Install Node.js terlebih dulu.');
+            return;
+          }
+        }
 
         if (activeProcessRef.current) {
           try { await activeProcessRef.current.kill(); } catch (e) {}
@@ -1425,8 +1487,21 @@ Integrations:
 
         let stdoutBuffer = '';
         let stderrBuffer = '';
+        let gotFirstOutput = false;
+        let firstOutputTimer: any = null;
+
+        const markFirstOutput = () => {
+          if (gotFirstOutput) return;
+          gotFirstOutput = true;
+          if (firstOutputTimer) {
+            clearTimeout(firstOutputTimer);
+            firstOutputTimer = null;
+          }
+        };
+
         const handleData = (data: string, isError = false) => {
           if (!data) return;
+          markFirstOutput();
           appendOutput(data);
           if (isError) stderrBuffer += data + '\n'; else stdoutBuffer += data + '\n';
           const urlRegex = /(https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::\]):\d+)/i;
@@ -1441,6 +1516,10 @@ Integrations:
         cmdInstance.on('stdout', data => handleData(data));
         cmdInstance.on('stderr', data => handleData(data, true));
         cmdInstance.on('close', data => {
+          if (firstOutputTimer) {
+            clearTimeout(firstOutputTimer);
+            firstOutputTimer = null;
+          }
           activeProcessRef.current = null;
           setTerminalSessions(prev => prev.map(s => s.id === sessionId ? { ...s, isRunning: false } : s));
           if (data?.code !== 0 && data?.code !== null) {
@@ -1466,6 +1545,16 @@ Integrations:
           }
         });
         activeProcessRef.current = await cmdInstance.spawn();
+
+        // If the command hangs before producing any output, kill it to avoid silent failures.
+        // Dev server should normally output initial logs quickly.
+        const firstOutputTimeoutMs = 25000;
+        firstOutputTimer = setTimeout(async () => {
+          if (!gotFirstOutput && activeProcessRef.current) {
+            appendOutput(`[TIMEOUT] Tidak ada output dalam ${Math.round(firstOutputTimeoutMs / 1000)} detik. Proses dihentikan.`);
+            try { await activeProcessRef.current.kill(); } catch (e) {}
+          }
+        }, firstOutputTimeoutMs);
       } catch (err: any) { appendOutput(`[ERROR] ${err?.message}`); }
     } else { appendOutput(`[BROWSER MODE] Perintah "${val}" tidak didukung.`); }
   };
