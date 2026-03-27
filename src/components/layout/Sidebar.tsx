@@ -139,6 +139,7 @@ interface SidebarProps {
   onFocusProblem: (p: CodeProblem) => void;
   activeAgentId: string;
   setActiveAgentId: (id: string) => void;
+  syncFilesFromNativePath: (path: string) => Promise<void>;
 }
 
 type FileTreeItem = {
@@ -292,8 +293,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   nativeProjectPath,
   ollamaUrl, setOllamaUrl,
   problems, onFocusProblem,
-  activeAgentId, setActiveAgentId
+  activeAgentId, setActiveAgentId,
+  syncFilesFromNativePath
 }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!nativeProjectPath || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await syncFilesFromNativePath(nativeProjectPath);
+      appendTerminalOutput(`[SYSTEM] Explorer refreshed: ${nativeProjectPath}`);
+    } catch (err: any) {
+      appendTerminalOutput(`[ERROR] Refresh failed: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const ConnectionStatus: React.FC<{ 
     status: 'idle' | 'loading' | 'success' | 'error', 
@@ -461,6 +477,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="hover:text-emerald-400 transition-colors text-emerald-500/80"
                 >
                   <Play size={14} fill="currentColor" />
+                </button>
+                <button 
+                  onClick={handleRefresh} 
+                  disabled={isSyncing || !nativeProjectPath}
+                  title="Refresh Explorer (Sync with Disk)" 
+                  className={cn("hover:text-blue-400 transition-colors", isSyncing && "animate-spin text-blue-500")}
+                >
+                  <RefreshCw size={14} />
                 </button>
                 <button onClick={createNewFile} title="New File" className="hover:text-white transition-colors">
                   <Plus size={14} />
@@ -835,25 +859,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 </section>
 
-                {/* AURA COLLECTIVE PERSONAS (v8.0.0) */}
-                <section className="space-y-3">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-blue-400 flex items-center gap-2 italic">
-                    <Bot size={12} /> Aura Collective Swarm
-                  </h3>
-                  <div className="grid grid-cols-1 gap-2">
-                    {AURA_COLLECTIVE.map(agent => (
-                      <div key={agent.id} className="p-2 border border-white/5 bg-white/5 rounded-xl hover:border-blue-500/30 transition-all group">
-                         <div className="flex items-center gap-2 mb-1">
-                            <div className="p-1 rounded bg-blue-500/10 text-blue-400">
-                               <Cpu size={12} />
-                            </div>
-                            <span className="text-[11px] font-bold text-gray-200">{agent.name}</span>
-                         </div>
-                         <p className="text-[9px] text-gray-500 leading-tight italic">{agent.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+
 
                 {/* Integrations Section */}
                 <section className="space-y-3">

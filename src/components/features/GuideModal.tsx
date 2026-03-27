@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Bot, Sparkles, Box, Search, Shield, Activity, GitBranch, Cloudy, RefreshCw, Terminal, Keyboard, Monitor, Smartphone, Cpu } from 'lucide-react';
+import { AURA_COLLECTIVE } from '../../utils/constants';
 
 interface GuideModalProps {
   isOpen: boolean;
@@ -145,6 +146,29 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     <li><b className="text-gray-300">Local Build</b>: Menggunakan Capacitor. Memerlukan <code className="text-emerald-300">Android Studio</code>.</li>
                   </ul>
                 </div>
+              </div>
+            </div>
+
+            {/* AURA COLLECTIVE PERSONAS */}
+            <div className="md:col-span-2 p-5 rounded-2xl border border-blue-500/10 bg-blue-500/5 space-y-4">
+              <h3 className="text-sm font-bold tracking-widest text-blue-400 flex items-center gap-2 italic">
+                <Bot size={14} /> AURA COLLECTIVE SWARM
+              </h3>
+              <p className="text-xs text-[#858585]">
+                Koleksi AI Agents (Swarm) khusus yang mengatur arsitektur, UI, keamanan, dan orkestrasi internal IDE:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {AURA_COLLECTIVE.map(agent => (
+                  <div key={agent.id} className="p-3 border border-white/5 bg-[#1e1e1e] rounded-xl hover:border-blue-500/40 transition-all group">
+                     <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20">
+                           <Cpu size={14} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-200">{agent.name}</span>
+                     </div>
+                     <p className="text-[10px] text-gray-500 leading-relaxed italic">{agent.description}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

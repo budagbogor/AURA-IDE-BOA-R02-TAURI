@@ -922,17 +922,27 @@ Integrations:
     if (!tauriFs) return;
     const newFiles: FileItem[] = [];
 
+    const IGNORE_LIST = ['node_modules', '.git', '.next', 'dist', 'build', '.DS_Store', 'target', 'vendor'];
+
     async function scanNative(currentPath: string) {
       const entries = await tauriFs.readDir(currentPath);
       for (const entry of entries) {
         const fullPath = `${currentPath}/${entry.name}`;
+        
+        // Skip ignored directories to prevent performance issues
+        if (entry.isDirectory && IGNORE_LIST.some(ignore => entry.name === ignore)) {
+          console.log(`[AURA FS] Ignoring directory: ${entry.name}`);
+          continue;
+        }
+
         if (entry.isDirectory) {
           await scanNative(fullPath);
         } else if (entry.isFile) {
+          // Optimization: Only read text-based or small files to avoid memory bloat
           const content = await tauriFs.readTextFile(fullPath);
           const ext = entry.name.split('.').pop();
           newFiles.push({
-            id: fullPath, // Use full path as ID for native files
+            id: fullPath, 
             name: entry.name,
             content: content,
             language: ext === 'ts' || ext === 'tsx' ? 'typescript' : ext === 'js' || ext === 'jsx' ? 'javascript' : ext || 'plaintext'
@@ -1347,9 +1357,9 @@ Integrations:
           let binary = val.split(' ')[0];
           let args = val.split(' ').slice(1);
           if (finalCommand && fullPath) {
-             binary = fullPath;
+             // Quote binary path if it contains spaces to ensure cmd /C works correctly
+             binary = fullPath.includes(' ') ? `"${fullPath}"` : fullPath;
           }
-          // Parsing && untuk Windows agar cmd menanggapinya sebagai operator shell asli
           const parsedArgs = args.map(a => a === '&&' || a === '&' ? a : a);
           cmdInstance = TauriCommand.create('cmd', ['/D', '/C', binary, ...parsedArgs], { cwd: normalizedCwd });
         } else {
@@ -1916,6 +1926,7 @@ Integrations:
         }}
         activeAgentId={activeAgentId}
         setActiveAgentId={setActiveAgentId}
+        syncFilesFromNativePath={syncFilesFromNativePath}
       />
 
       {/* Main Area */}
