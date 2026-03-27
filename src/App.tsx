@@ -929,16 +929,21 @@ Integrations:
       for (const entry of entries) {
         const fullPath = `${currentPath}/${entry.name}`;
         
-        // Skip ignored directories to prevent performance issues
-        if (entry.isDirectory && IGNORE_LIST.some(ignore => entry.name === ignore)) {
-          console.log(`[AURA FS] Ignoring directory: ${entry.name}`);
-          continue;
-        }
-
         if (entry.isDirectory) {
+          // Skip ignored directories from recursive scan, but still show them as folder placeholders
+          if (IGNORE_LIST.some(ignore => entry.name === ignore)) {
+            console.log(`[AURA FS] Showing placeholder for: ${entry.name}`);
+            // Add a placeholder file so the folder appears in the tree
+            newFiles.push({
+              id: fullPath + '/.aura-placeholder',
+              name: '.aura-placeholder',
+              content: `// This folder (${entry.name}) is not scanned for performance reasons.`,
+              language: 'plaintext'
+            });
+            continue;
+          }
           await scanNative(fullPath);
         } else if (entry.isFile) {
-          // Optimization: Only read text-based or small files to avoid memory bloat
           const content = await tauriFs.readTextFile(fullPath);
           const ext = entry.name.split('.').pop();
           newFiles.push({
@@ -1262,42 +1267,8 @@ Integrations:
     }
 
     let finalCommand = val;
-    let fullPath = "";
-    if ((getIsTauri() || !!TauriCommand) && isWindows && (val.startsWith('npm') || val.startsWith('npx'))) {
-       try {
-          const binaryName = val.split(' ')[0];
-          // Use full path to binary for better reliability on Windows
-          const checkCmd = TauriCommand.create('cmd', ['/C', 'where', binaryName]);
-          const out = await checkCmd.execute();
-          if (out.code === 0 && out.stdout) {
-              const lines = out.stdout.split(/\r?\n/).filter(l => l.trim());
-              // PREFER .cmd or .exe on Windows to avoid sh scripts
-              const preferred = lines.find(l => l.toLowerCase().endsWith('.cmd') || l.toLowerCase().endsWith('.exe')) || lines[0];
-              fullPath = preferred.trim();
-          } else {
-              // FALLBACK: Check standard paths if 'where' fails
-              const commonPaths = [
-                  `C:\\Program Files\\nodejs\\${binaryName}.cmd`,
-                  `C:\\Program Files\\nodejs\\${binaryName}.exe`,
-                  `C:\\Users\\${window.process?.env?.USERNAME || 'User'}\\AppData\\Roaming\\npm\\${binaryName}.cmd`
-              ];
-              for (const p of commonPaths) {
-                  try {
-                      const exists = await TauriCommand.create('cmd', ['/C', 'if exist', p, 'echo YES']).execute();
-                      if (exists.stdout.includes('YES')) { fullPath = p; break; }
-                  } catch(e) {}
-              }
-          }
-
-          if (fullPath) {
-              // Don't build a single quoted string, finalCommand acts as a flag
-              finalCommand = val;
-              appendOutput(`[AURA INFO] Resolved ${binaryName} to: ${fullPath}`);
-          }
-       } catch (e) {
-          console.warn('Path resolution failed:', e);
-       }
-    }
+    // Resolusi path binary dihapus — cmd /S /C akan menggunakan PATH sistem secara native.
+    // Ini lebih robust karena cmd.exe sendiri yang menemukan npm/npx/node.
 
     if ((getIsTauri() || !!TauriCommand) && TauriCommand) {
       try {
@@ -1353,14 +1324,11 @@ Integrations:
 
         let cmdInstance;
         if (isWindows) {
-          // Solusi Final: Biarkan penggunaannya seperti semula, jangan tambahkan tanda kutip. TauriPlugin akan handle ini.
-          let binary = val.split(' ')[0];
-          let args = val.split(' ').slice(1);
-          if (finalCommand && fullPath) {
-             binary = fullPath;
-          }
-          const parsedArgs = args.map(a => a === '&&' || a === '&' ? a : a);
-          cmdInstance = TauriCommand.create('cmd', ['/D', '/C', binary, ...parsedArgs], { cwd: normalizedCwd });
+          // SOLUSI ROBUST: Gunakan cmd /S /C "command" untuk menjalankan perintah sebagai satu string utuh.
+          // /S = jangan strip tanda kutip luar. /C = jalankan lalu exit setelah selesai.
+          // Ini membiarkan cmd.exe menemukan npm/npx/node sendiri via PATH sistem.
+          // Proses long-running (seperti Vite dev server) akan tetap hidup sampai ditutup manual.
+          cmdInstance = TauriCommand.create('cmd', ['/S', '/C', `"${val}"`], { cwd: normalizedCwd });
         } else {
           cmdInstance = TauriCommand.create('sh', ['-c', val], { cwd: normalizedCwd });
         }
