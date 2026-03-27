@@ -69,15 +69,24 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    if (autoFixTrigger && autoFixTrigger > 0 && autoFixMessage && !isLoading) {
-      handleSend(autoFixMessage);
-    }
-  }, [autoFixTrigger]);
+  // Auto-fix useEffect DIHAPUS (v11.0.21) — mencegah infinite loop AI.
 
   const handleSend = async (overrideMsg?: string, isAutoCorrection: boolean = false) => {
     const userMessage = typeof overrideMsg === 'string' ? overrideMsg : input;
     if (!userMessage.trim() || isLoading) return;
+
+    // --- DETEKSI COMMAND CLI (v11.0.21) ---
+    // Jika user mengetik command CLI di chat, route langsung ke terminal.
+    const cliPatterns = /^(npm|npx|node|git|yarn|pnpm|pip|python|cd|ls|dir|mkdir|cat|echo)\s/i;
+    if (cliPatterns.test(userMessage.trim()) && onExecuteCommand) {
+      onExecuteCommand(userMessage.trim());
+      setMessages(prev => [...prev, 
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: `✅ Perintah \`${userMessage.trim()}\` telah dikirim ke Terminal untuk dieksekusi.` }
+      ]);
+      if (typeof overrideMsg !== 'string') setInput('');
+      return;
+    }
     
     if (!apiKey) {
       setMessages(prev => [...prev, { role: 'user', content: userMessage }, { role: 'assistant', content: '⚠️ API Key belum diatur. Silakan atur di Settings terlebih dahulu.' }]);
@@ -196,11 +205,11 @@ export const AiComposerPanel: React.FC<AiComposerPanelProps> = ({
            // --- ELITE DESIGN & STRUCTURE AUDIT ---
         const missingFiles = auditProjectStructure(parseComposerResponse(fullResponse), projectTree);
         if (missingFiles.length > 0) {
-           appendTerminalOutput(`[AURA ELITE] Mendeteksi ketidakkonsistenan Desain & Struktur.`);
-           appendTerminalOutput(`[AURA ELITE] Melengkapi manifest penting: ${missingFiles.join(', ')}...`);
-           const autoPrompt = `Project ini membutuhkan sentuhan akhir untuk standar World-Class. Tolong buatkan file berikut dengan desain premium (Bento/Glassmorphism/Tokens): ${missingFiles.join(', ')}. Pastikan setiap file memiliki estetika tinggi.`;
-           // Trigger recursive send with auto-correction prompt
-           setTimeout(() => handleSend(autoPrompt, true), 1000);
+           appendTerminalOutput(`[AURA ELITE] Mendeteksi file yang bisa dilengkapi: ${missingFiles.join(', ')}`);
+           appendTerminalOutput(`[AURA ELITE] Gunakan chat untuk meminta AI membuatkan file tersebut.`);
+           // TIDAK memanggil handleSend secara rekursif � mencegah infinite loop (v11.0.21).
+           
+           
         } else {
            appendTerminalOutput(`[AURA ELITE] Desain & Struktur terverifikasi: WORLD-CLASS.`);
         }

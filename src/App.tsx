@@ -455,26 +455,10 @@ export default function App() {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  // --- TERMINAL ERROR LISTENER (Self-Healing Phase 8) ---
-  useEffect(() => {
-    const handleTerminalError = (e: any) => {
-      const { message } = e.detail;
-      appendTerminalOutput(`[AURA SELF-HEALING] 🛡️ Mendeteksi kegagalan eksekusi: ${message}`);
-      appendTerminalOutput(`[AURA SELF-HEALING] 🤖 Meminta intervensi AI untuk perbaikan otomatis...`);
-      
-      const fixPrompt = `Terminal error detected: "${message}". Please analyze the current project state and fix the root cause of this error.`;
-      
-      // Trigger AI Composer auto-fix
-      setAutoFixMsg(fixPrompt);
-      setAutoFixTrigger(Date.now());
-      
-      // Switch to AI tab to show progress
-      setShowAiPanel(true);
-    };
+  // --- TERMINAL ERROR LISTENER DIHAPUS (v11.0.21) ---
+  // Self-healing auto-fix dihapus karena menyebabkan infinite loop.
+  // Error terminal sekarang hanya di-log ke konsol tanpa memicu AI auto-fix.
 
-    window.addEventListener('terminal-error' as any, handleTerminalError);
-    return () => window.removeEventListener('terminal-error' as any, handleTerminalError);
-  }, [appendTerminalOutput, setAutoFixMsg, setAutoFixTrigger, setShowAiPanel]);
 
   // --- RESTORE TAURI INITIALIZATION (v2.6.6-PRO) ---
   useEffect(() => {

@@ -23,18 +23,17 @@ export const useTerminal = () => {
       detail: { id: targetId, data: lines.join('\n') }
     }));
 
-    // 3. --- SELF-HEALING LISTENER (v8.0.0) ---
+    // 3. --- ERROR LOGGING (tanpa Self-Healing dispatch untuk mencegah infinite loop) ---
     const errorPatterns = [
-      /error:/i, /failed to/i, /npm ERR!/i, /ReferenceError/i, /TypeError/i, 
-      /SyntaxError/i, /sh:.*not found/i, /command not found/i, /node_modules.*missing/i
+      /npm ERR!/i, /ReferenceError/i, /TypeError/i, 
+      /SyntaxError/i, /command not found/i
     ];
 
     const hasError = lines.some(line => errorPatterns.some(pattern => pattern.test(line)));
     if (hasError) {
       const errorMsg = lines.find(line => errorPatterns.some(pattern => pattern.test(line))) || 'Unknown Error';
-      window.dispatchEvent(new CustomEvent('terminal-error', {
-        detail: { id: targetId, message: errorMsg }
-      }));
+      console.warn('[AURA Terminal Error Detected]', errorMsg);
+      // TIDAK dispatch terminal-error event — ini mencegah infinite loop AI auto-fix.
     }
   };
 
