@@ -1355,8 +1355,8 @@ Integrations:
           }
         };
 
-        cmdInstance.on('stdout', data => handleData(data));
-        cmdInstance.on('stderr', data => handleData(data, true));
+        cmdInstance.stdout.on('data', (data: any) => handleData(data));
+        cmdInstance.stderr.on('data', (data: any) => handleData(data, true));
         cmdInstance.on('close', data => {
           activeProcessRef.current = null;
           setTerminalSessions(prev => prev.map(s => s.id === sessionId ? { ...s, isRunning: false } : s));
