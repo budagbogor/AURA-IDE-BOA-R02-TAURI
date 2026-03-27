@@ -233,6 +233,9 @@ export default function App() {
     systemInstruction, setSystemInstruction
   } = useAiChat();
 
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('http://localhost:3000');
+
   const [mcpServers, setMcpServers] = useState<any[]>(() => {
     const saved = localStorage.getItem('aura_mcp_servers');
     if (saved) {
@@ -1194,6 +1197,15 @@ Integrations:
     const sessionId = activeTerminalId;
     const appendOutput = (data: string) => {
       appendTerminalOutput(data, sessionId);
+      
+      // --- AUTO PREVIEW DETECTION (v11.0.12) ---
+      if (data.includes('Local:   http://localhost:') || data.includes('http://localhost:3000') || data.includes('http://localhost:5173')) {
+         const match = data.match(/http:\/\/localhost:\d+/);
+         if (match) {
+            setPreviewUrl(match[0]);
+            setShowPreviewPanel(true);
+         }
+      }
     };
 
     // --- NATIVE SYNC GUARD (v2.4.2) ---
@@ -1262,7 +1274,7 @@ Integrations:
           }
 
           if (fullPath) {
-              // Important: Don't over-quote here, final wrapping happens in cmd /C
+              // Important: Do not enclose in outer quotes for cmd /S /C
               finalCommand = `"${fullPath}" ${val.split(' ').slice(1).join(' ')}`;
               appendOutput(`[AURA INFO] Resolved ${binaryName} to: ${fullPath}`);
           }
@@ -1322,8 +1334,8 @@ Integrations:
 
         let cmdInstance;
         if (isWindows) {
-          // Wrap the entire command string in quotes for /S /C to handle complex paths correctly
-          cmdInstance = TauriCommand.create('cmd', ['/S', '/C', finalCommand], { cwd: normalizedCwd });
+          // Changed /S /C wrapping to let Tauri argument serialization handle escaping naturally
+          cmdInstance = TauriCommand.create('cmd', ['/C', finalCommand], { cwd: normalizedCwd });
         } else {
           cmdInstance = TauriCommand.create('sh', ['-c', finalCommand], { cwd: normalizedCwd });
         }
@@ -2008,8 +2020,8 @@ Integrations:
 
       </div>
       
-      {/* 3rd Column (Right Panel): AI Chat / Composer */}
-      {!zenMode && showAiPanel && (
+      {/* 3rd Column (Right Panel): AI Chat / Composer / Preview */}
+      {!zenMode && (showAiPanel || showPreviewPanel) && (
         <div 
           style={{ width: aiPanelWidth }}
           className={cn(
@@ -2030,49 +2042,71 @@ Integrations:
             )}
           />
           <div className="p-3 border-b border-white/5 bg-[#252526]/80 backdrop-blur-md flex items-center justify-between shrink-0">
-            <span className="text-[11px] font-black tracking-widest uppercase text-blue-400 flex items-center gap-2">
-              <Sparkles size={14} /> Aura AI Prompt
-            </span>
+            <div className="flex gap-4 items-center">
+              <button 
+                onClick={() => { setShowPreviewPanel(false); setShowAiPanel(true); }} 
+                className={cn("text-[11px] font-black tracking-widest uppercase flex items-center gap-2 transition-colors", !showPreviewPanel ? "text-blue-400" : "text-white/50 hover:text-white")}
+              >
+                <Sparkles size={14} /> Aura AI
+              </button>
+              <button 
+                onClick={() => { setShowPreviewPanel(true); setShowAiPanel(false); }} 
+                className={cn("text-[11px] font-black tracking-widest uppercase flex items-center gap-2 transition-colors", showPreviewPanel ? "text-emerald-400" : "text-white/50 hover:text-white")}
+              >
+                <Globe size={14} /> Preview
+              </button>
+            </div>
             <button 
-              onClick={() => setShowAiPanel(false)} 
+              onClick={() => { setShowAiPanel(false); setShowPreviewPanel(false); }} 
               className="hover:bg-red-500/20 hover:text-red-400 p-1 rounded-md transition-colors text-white/50" 
-              title="Sembunyikan Panel (Tampilkan via Menu View)"
+              title="Sembunyikan Panel"
             >
               <X size={14} />
             </button>
           </div>
           
           <div className="flex-1 overflow-hidden relative">
-            <AiComposerPanel 
-              provider={aiProvider}
-              apiKey={
-                aiProvider === 'gemini' ? geminiApiKey : 
-                aiProvider === 'openrouter' ? openRouterApiKey : 
-                aiProvider === 'bytez' ? bytezApiKey :
-                sumopodApiKey
-              }
-              model={
-                aiProvider === 'gemini' ? selectedModel : 
-                aiProvider === 'openrouter' ? openRouterModel : 
-                aiProvider === 'bytez' ? bytezModel :
-                sumopodModel
-              }
-              files={files}
-              activeFileId={activeFileId}
-              appendTerminalOutput={appendTerminalOutput}
-              onSuccess={handleAiSuccess}
-              projectTree={files.map(f => f.id).join('\n')}
-              messages={composerMessages}
-              setMessages={setComposerMessages}
-              autoFixTrigger={autoFixTrigger}
-              autoFixMessage={autoFixMsg}
-              onExecuteCommand={executeCommand}
-              onApplyCode={handleApplyCode}
-              nativeProjectPath={nativeProjectPath}
-              mcpTools={mcpServers.filter(s => s.connected).flatMap(s => s.tools || [])}
-              ollamaUrl={ollamaUrl}
-              activeAgentId={activeAgentId}
-            />
+            {showPreviewPanel ? (
+               <div className="w-full h-full bg-white relative flex flex-col">
+                 <div className="h-10 bg-gray-100 flex items-center px-3 border-b border-gray-300 gap-2 shrink-0">
+                    <button onClick={() => { const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement; if (iframe) iframe.src = previewUrl; }} className="p-1.5 hover:bg-gray-200 rounded text-gray-600 transition-colors"><RotateCcw size={14} /></button>
+                    <input type="text" value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') { const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement; if (iframe) iframe.src = previewUrl; } }} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <a href={previewUrl} target="_blank" rel="noreferrer" className="p-1.5 hover:bg-gray-200 rounded text-gray-600 transition-colors"><ExternalLink size={14} /></a>
+                 </div>
+                 <iframe id="preview-iframe" src={previewUrl} className="flex-1 w-full bg-white border-none" title="App Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+               </div>
+            ) : (
+              <AiComposerPanel 
+                provider={aiProvider}
+                apiKey={
+                  aiProvider === 'gemini' ? geminiApiKey : 
+                  aiProvider === 'openrouter' ? openRouterApiKey : 
+                  aiProvider === 'bytez' ? bytezApiKey :
+                  sumopodApiKey
+                }
+                model={
+                  aiProvider === 'gemini' ? selectedModel : 
+                  aiProvider === 'openrouter' ? openRouterModel : 
+                  aiProvider === 'bytez' ? bytezModel :
+                  sumopodModel
+                }
+                files={files}
+                activeFileId={activeFileId}
+                appendTerminalOutput={appendTerminalOutput}
+                onSuccess={handleAiSuccess}
+                projectTree={files.map(f => f.id).join('\n')}
+                messages={composerMessages}
+                setMessages={setComposerMessages}
+                autoFixTrigger={autoFixTrigger}
+                autoFixMessage={autoFixMsg}
+                onExecuteCommand={executeCommand}
+                onApplyCode={handleApplyCode}
+                nativeProjectPath={nativeProjectPath}
+                mcpTools={mcpServers.filter(s => s.connected).flatMap(s => s.tools || [])}
+                ollamaUrl={ollamaUrl}
+                activeAgentId={activeAgentId}
+              />
+            )}
           </div>
         </div>
       )}
