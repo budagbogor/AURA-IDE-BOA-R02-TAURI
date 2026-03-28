@@ -402,10 +402,9 @@ export default function App() {
   };
 
   const closeFolder = async () => {
-    // 1. Kill active terminal process
+    // 1. Kill active terminal process (tree kill for Vite/Node via handleTerminalKill)
     if (activeProcessRef.current) {
-      try { await activeProcessRef.current.kill(); } catch (e) {}
-      activeProcessRef.current = null;
+      await handleTerminalKill();
     }
 
     // 2. Clear File Explorer
@@ -491,9 +490,24 @@ export default function App() {
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
+    
+    // Global terminal cleanup on app close (Orphan Vite/Node process tree killer)
+    const handleUnload = () => {
+      if (activeProcessRef.current && TauriCommand) {
+        try {
+           const pid = activeProcessRef.current.pid;
+           TauriCommand.create('cmd', ['/c', 'taskkill', '/PID', pid.toString(), '/T', '/F']).execute().catch(()=>{});
+        } catch(e) {}
+      }
+    };
+    
     window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, []);
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [TauriCommand]);
 
   // --- TERMINAL ERROR LISTENER DIHAPUS (v11.0.21) ---
   // Self-healing auto-fix dihapus karena menyebabkan infinite loop.
@@ -1472,13 +1486,9 @@ Integrations:
         // Always attempt standard graceful kill first
         await activeProcessRef.current.kill().catch(() => {});
         
-        // If on Windows and it was a Vite dev server (node), force cleanup its orphan process
+        // If on Windows, force cleanup its orphan process tree (like Node/Vite)
         if (isWin && TauriCommand && pid) {
-          const currentCmd = terminalSessions.find(s => s.id === activeTerminalId)?.currentCommand || '';
-          if (currentCmd.includes('npm run dev') || currentCmd.includes('vite')) {
-            // Kill only the specific process tree async, do not await to prevent blocking
-            TauriCommand.create('cmd', ['/c', 'taskkill', '/PID', pid.toString(), '/T', '/F']).execute().catch(() => {});
-          }
+           TauriCommand.create('cmd', ['/c', 'taskkill', '/PID', pid.toString(), '/T', '/F']).execute().catch(() => {});
         }
         
         appendTerminalOutput('[SYSTEM] Process terminated.');
