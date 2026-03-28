@@ -1406,12 +1406,8 @@ Integrations:
             const binaryName = directBinaries[program];
             appendOutput(`[AURA] Direct invoke: ${binaryName} ${args.join(' ')}`);
             cmdInstance = TauriCommand.create(binaryName, args, { cwd: normalizedCwd });
-          } else if (program === 'npm' || program === 'npx') {
-            // Gunakan CMD untuk NPM/NPX karena PowerShell mem-buffer stdout proses long-running (seperti Vite)
-            appendOutput(`[AURA] Native CMD Invoke: cmd /c ${val}`);
-            cmdInstance = TauriCommand.create('cmd', ['/c', val], { cwd: normalizedCwd });
           } else {
-            // Fallback: PowerShell untuk command umum (lebih reliable dari cmd.exe)
+            // Fallback: PowerShell untuk command umum & npm (lebih reliable dari cmd.exe)
             appendOutput(`[AURA] PowerShell: ${val}`);
             cmdInstance = TauriCommand.create('powershell', ['-NoProfile', '-Command', val], { cwd: normalizedCwd });
           }
