@@ -1364,10 +1364,14 @@ Integrations:
             appendOutput(`Process exited with code ${data.code}`);
             const errLog = stderrBuffer.trim() ? stderrBuffer : stdoutBuffer;
             if (errLog) {
-               // PENCEGAHAN INFINITE LOOP: Jangan jalankan auto-fix jika ini adalah command npm/npx/git 
                // karena error CLI biasanya disebabkan config salah, bukan sintaks kode.
                if (trimmedVal.startsWith('npm') || trimmedVal.startsWith('npx') || trimmedVal.startsWith('git') || trimmedVal.startsWith('node')) {
                    appendOutput(`[SYSTEM] Auto-fix dilewati untuk perintah CLI guna menghindari eksekusi berulang (loop).`);
+                   
+                   if ((trimmedVal.includes('npm install') || trimmedVal.includes('npm i')) && errLog.includes('ERESOLVE') && !trimmedVal.includes('--legacy-peer-deps')) {
+                       appendOutput(`[SYSTEM] ⚠️ Terdeteksi konflik dependensi (ERESOLVE). Mencoba kembali secara paksa dengan --legacy-peer-deps...`);
+                       executeCommand(`${trimmedVal} --legacy-peer-deps`);
+                   }
                } else {
                    const shortLog = errLog.length > 2500 ? errLog.substring(errLog.length - 2500) : errLog;
                    appendOutput(`[AUTO-FIX] Mendelegasikan perbaikan ke AI...`);
