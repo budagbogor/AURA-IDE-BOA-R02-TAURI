@@ -1310,7 +1310,8 @@ Integrations:
     appendOutput(`${cwdDisplay} $ ${val}`);
 
     const isWindows = window.navigator.platform.toLowerCase().includes('win');
-    const trimmedVal = val.trim();
+    let trimmedVal = val.trim();
+    if (trimmedVal.includes('rundev')) trimmedVal = trimmedVal.replace('rundev', 'run dev');
     const isNpm = trimmedVal.startsWith('npm');
 
     if (trimmedVal === 'npm install' || trimmedVal === 'npm i') {
@@ -1343,29 +1344,14 @@ Integrations:
         setCommandHistory(prev => [val, ...prev.filter(h => h !== val)].slice(0, 50));
         setHistoryIndex(-1);
 
-        if (val.trim() === 'clear' || val.trim() === 'cls') {
+        if (trimmedVal === 'clear' || trimmedVal === 'cls') {
           setTerminalSessions(prev => prev.map(s => s.id === sessionId ? { ...s, output: [] } : s));
-          return;
-        }
-        if (val.trim() === 'aura diagnostic') {
-          appendOutput(`[DIAGNOSTIC] OS: ${isWindows ? 'Windows' : 'Unix'}`);
-          appendOutput(`[DIAGNOSTIC] CWD: ${normalizedCwd}`);
-          appendOutput(`[DIAGNOSTIC] nativeProjectPath: ${nativeProjectPath || 'null'}`);
-          appendOutput(`[DIAGNOSTIC] terminalCwdRef: ${terminalCwdRef.current || 'null'}`);
-          try {
-             const nodeCheck = await TauriCommand.create('node', ['-v']).execute();
-             appendOutput(`[DIAGNOSTIC] Node: ${nodeCheck.stdout.trim() || 'error code ' + nodeCheck.code}`);
-             const npmCheck = await TauriCommand.create('npm.cmd', ['-v']).execute();
-             appendOutput(`[DIAGNOSTIC] NPM: ${npmCheck.stdout.trim() || 'error code ' + npmCheck.code}`);
-          } catch(e: any) {
-             appendOutput(`[DIAGNOSTIC ERROR] ${e?.message}`);
-          }
           return;
         }
         if (val.trim() === 'pwd') { appendOutput(normalizedCwd); return; }
 
-        if (val.trim().startsWith('cd ')) {
-          const target = val.trim().substring(3).trim().replace(/"/g, '').replace(/'/g, '');
+        if (trimmedVal.startsWith('cd ')) {
+          const target = trimmedVal.substring(3).trim().replace(/"/g, '').replace(/'/g, '');
           let newPath = '';
           if (target === '..') {
             const parts = normalizedCwd.split('\\'); parts.pop();
@@ -1382,37 +1368,32 @@ Integrations:
           return;
         }
 
-        appendOutput(`[SYSTEM] Menjalankan (Native CLI): ${val}`);
+        appendOutput(`[SYSTEM] Menjalankan: ${trimmedVal}`);
         setTerminalSessions(prev => prev.map(s => s.id === sessionId ? { ...s, isRunning: true, currentCommand: trimmedVal } : s));
 
         let cmdInstance;
         if (isWindows) {
-          // === WINDOWS TERMINAL ENGINE v11.0.22 ===
-          // Strategi: Panggil binary LANGSUNG via Tauri capabilities (bypass cmd.exe).
-          // Tauri shell plugin mendukung pemanggilan langsung npm.cmd, npx.cmd, dll.
-          // Untuk command lain, gunakan PowerShell sebagai fallback.
           const parts = trimmedVal.split(/\s+/);
           const program = parts[0].toLowerCase();
           const args = parts.slice(1);
           
-          // Map program ke nama binary yang benar di Windows + terdaftar di Tauri capabilities
           const directBinaries: Record<string, string> = {
             'node': 'node',
             'git': 'git',
           };
           
           if (directBinaries[program]) {
-            // Panggil binary langsung — TANPA cmd.exe wrapper
             const binaryName = directBinaries[program];
             appendOutput(`[AURA] Direct invoke: ${binaryName} ${args.join(' ')}`);
             cmdInstance = TauriCommand.create(binaryName, args, { cwd: normalizedCwd });
           } else {
-            // Fallback: PowerShell untuk command umum & npm (lebih reliable dari cmd.exe)
-            appendOutput(`[AURA] PowerShell: ${val}`);
-            cmdInstance = TauriCommand.create('powershell', ['-NoProfile', '-Command', val], { cwd: normalizedCwd });
+            appendOutput(`[AURA] PowerShell native: ${trimmedVal}`);
+            // PENTING: Fix issue "&&" not running in powershell 5.1 dengan replace ke ";"
+            const psSafeVal = trimmedVal.replace(/&&/g, ';');
+            cmdInstance = TauriCommand.create('powershell', ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-Command', psSafeVal], { cwd: normalizedCwd });
           }
         } else {
-          cmdInstance = TauriCommand.create('sh', ['-c', val], { cwd: normalizedCwd });
+          cmdInstance = TauriCommand.create('sh', ['-c', trimmedVal], { cwd: normalizedCwd });
         }
 
         let stdoutBuffer = '';
