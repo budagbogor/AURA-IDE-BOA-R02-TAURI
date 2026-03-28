@@ -48,4 +48,9 @@ Selalu definisikan variabel berikut di root CSS:
 ## 6. CODE ACCURACY & BOILERPLATE (ANTI-GAGAL)
 - **Monolithic TSConfig**: Saat men-scaffold project baru menggunakan Vite/React/TS, HINDARI penggunaan properti \`"references": [{ "path": "./tsconfig.node.json" }]\` di dalam \`tsconfig.json\` karena sering menyebabkan error "ENOENT" di terminal pengguna. Sebaliknya, buatlah satu file \`tsconfig.json\` utuh dan mandiri tanpa memecahnya, ATAU pastikan Anda 100% menulis isi dari \`tsconfig.node.json\` tersebut.
 - **NPM Modules**: Selalu lengkapi dengan file \`package.json\` dan isi skrip wajib seperti \`dev: vite\`, \`build: vite build\` agar eksekusi \`npm run dev\` tidak gagal.
+
+## 7. ZERO TOLERANCE UNTUK DESAIN 'WHITE/BLACK SCREEN' (WAJIB)
+- **TIDAK BOLEH** menghasilkan antarmuka primitif (latar hitam pekat/putih polos tanpa padding dan styling). UI yang terlihat seolah-olah "belum di-*render*" adalah KEGAGALAN FATAL.
+- Anda WAJIB menggunakan kelas **TailwindCSS** secara ekstensif pada setiap elemen halaman. Contoh dasar untuk kontainer utama: \`min-h-screen bg-gradient-to-br from-[#050505] to-[#121212] text-white selection:bg-aura-primary selection:text-white\`.
+- **Wajib Ada Estetika**: Jika Anda mendesain "Landing Page", Anda harus membuat **Hero Section** besar dengan tipografi mencolok (seperti \`text-transparent bg-clip-text bg-gradient-to-r...\`) dan kartu berjejer (flex/grid) yang mempercantik tampilan.
 `;
