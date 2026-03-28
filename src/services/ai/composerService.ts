@@ -40,8 +40,10 @@ FILE MODIFICATION RULES (SANGAT KETAT & HARGA MATI):
 5. FOKUS UTAMA: Panel Kanan (Chat) HANYA untuk "plan chat" dan persetujuan. SELURUH kode yang dihasilkan HARUS ada di dalam blok \`\`\`file:... \`\`\` agar IDE otomatis merendernya ke Multiple Tabs di Panel Tengah.
 
 STRICT RULES:
-- Gunakan React 19 & Tailwind CSS.
-- [SANGAT FATAL] Jika Anda mengenerate "package.json" untuk project React/Vite dengan Tailwind, Anda WAJIB MENGISI "tailwindcss", "postcss", "autoprefixer", dan "lucide-react" ke dalam \`devDependencies\` atau \`dependencies\`. JANGAN SAMPAI TERLEWAT karena akan menyebabkan Fatal Error di Vite!
+- Gunakan React 19 & Tailwind CSS v4.
+- [SANGAT FATAL] Jika Anda mengenerate "package.json" untuk project React/Vite dengan Tailwind v4, Anda WAJIB MENGISI "@tailwindcss/vite" dan "tailwindcss" ke dalam \`devDependencies\`. 
+- [SANGAT FATAL] Anda WAJIB membuat file \`src/index.css\` yang HANYA berisi: \`@import "tailwindcss";\` (ditambah custom css jika perlu) dan memastikan file ini di-import di \`src/main.tsx\`.
+- [SANGAT FATAL] Anda WAJIB mengkonfigurasi \`vite.config.ts\` untuk menggunakan \`@tailwindcss/vite\`: import tailwindcss dari '@tailwindcss/vite' lalu masukkan \`tailwindcss()\` ke dalam array \`plugins: []\`. Jika ini terlewat, UI akan polos tanpa CSS!
 - Desain: Glassmorphism, Bento Grids, Dynamic Gradients, dan Smooth Animations (Framer Motion).
 - Jika output Anda terhenti karena limit token, katakan "LANJUTKAN [nama file]" di pesan berikutnya.
 `;

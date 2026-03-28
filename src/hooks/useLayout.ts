@@ -61,9 +61,9 @@ export const useLayout = () => {
         if (newWidth > 150 && newWidth < 900) setSidebarWidth(newWidth);
       }
       if (isResizingBottom) {
-        let footerOffset = 44;
+        let footerOffset = 26; // Adjusted to allow higher scaling
         const newHeight = window.innerHeight - e.clientY - footerOffset; 
-        if (newHeight >= 60 && newHeight <= window.innerHeight - 50) setBottomHeight(newHeight);
+        if (newHeight >= 60 && newHeight <= window.innerHeight - 80) setBottomHeight(newHeight);
       }
       if (isResizingAiPanel) {
         let newWidth;
