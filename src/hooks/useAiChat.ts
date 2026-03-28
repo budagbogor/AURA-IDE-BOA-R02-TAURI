@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAppStore } from '../store/useAppStore';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -6,9 +7,8 @@ export interface ChatMessage {
 }
 
 export const useAiChat = () => {
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Welcome to **Aura AI IDE**. I am your coding assistant. How can I help you today?' }
-  ]);
+  const chatMessages = useAppStore(state => state.chatMessages);
+  const setChatMessages = useAppStore(state => state.setChatMessages);
   const [composerMessages, setComposerMessages] = useState<any[]>([
     { role: 'assistant', content: 'Assalamualaikum...' }
   ]);

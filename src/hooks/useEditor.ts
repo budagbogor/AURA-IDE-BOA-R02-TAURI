@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useAppStore } from '../store/useAppStore';
 
 export interface FileItem {
   id: string;
@@ -24,8 +25,10 @@ export interface StagingFile {
 }
 
 export const useEditor = () => {
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [activeFileId, setActiveFileId] = useState<string>('');
+  const files = useAppStore(state => state.files);
+  const setFiles = useAppStore(state => state.setFiles);
+  const activeFileId = useAppStore(state => state.activeFileId);
+  const setActiveFileId = useAppStore(state => state.setActiveFileId);
   const [projectName, setProjectName] = useState('AURA-PROJECT');
   const [problems, setProblems] = useState<CodeProblem[]>([]);
   const [isScanning, setIsScanning] = useState(false);

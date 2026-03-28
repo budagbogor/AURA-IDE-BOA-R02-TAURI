@@ -73,7 +73,7 @@ import { getFileIcon } from './utils/icons';
 import { EditorArea } from '@/components/layout/EditorArea';
 import { BottomPanel } from '@/components/layout/BottomPanel';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { AiComposerPanel } from '@/components/AiComposer/AiComposerPanel';
+import { AiComposerV3 } from '@/components/AiComposer/AiComposerV3';
 import { AuraLogo } from '@/components/layout/AuraLogo';
 import { GuideModal } from '@/components/features/GuideModal';
 import { CreateProjectModal } from '@/components/modals/CreateProjectModal';
@@ -98,7 +98,10 @@ import { mcpManager } from './services/mcpService';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { useGithub } from './hooks/useGithub';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useTerminal } from './hooks/useTerminal';
+import { useAppStore } from '@/store/useAppStore';
 import { useAiManager } from './hooks/useAiManager';
 import { useLayout } from './hooks/useLayout';
 import { useEditor } from './hooks/useEditor';
@@ -282,22 +285,9 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [activeFile, nativeProjectPath]);
 
-  const [mcpServers, setMcpServers] = useState<any[]>(() => {
-    const saved = localStorage.getItem('aura_mcp_servers');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.map((p: any) => ({
-          ...p,
-          type: p.type || 'sse',
-          tools: p.tools || []
-        }));
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+
+  const mcpServers = useAppStore(state => state.mcpServers);
+  const setMcpServers = useAppStore(state => state.setMcpServers);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeProcessRef = useRef<any>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -407,6 +397,13 @@ export default function App() {
       await handleTerminalKill();
     }
 
+    // 1.5 Stop Native Watcher
+    try {
+      await invoke('stop_watcher');
+    } catch (e) {
+      console.warn('Watcher stop error:', e);
+    }
+
     // 2. Clear File Explorer
     setFiles([]);
     setActiveFileId('');
@@ -422,18 +419,17 @@ export default function App() {
     ]);
     setAttachedFiles([]);
 
-    // 4. Reset Terminal Sessions
+    // 4. Reset Terminal Sessions explicitly to force Xterm to re-mount and clear visual output
+    const resetId = `default-${Date.now()}`;
     setTerminalSessions([
-      { id: 'default', name: 'Terminal', output: ['\u001b[36m⚡ AURA TERMINAL ENGINE V5.0.0\u001b[0m', 'Ready for intelligent development...', ''] }
+      { id: resetId, name: 'Terminal', output: ['\u001b[36m⚡ AURA TERMINAL ENGINE V5.0.0\u001b[0m', 'Ready for intelligent development...', '[SYSTEM] Project closed. All panels reset. Terminal cleared.', ''] }
     ]);
-    setActiveTerminalId('default');
+    setActiveTerminalId(resetId);
 
     // 5. Clear Problems & UI Tabs
     setProblems([]);
     setSidebarTab('files');
     setBottomTab('terminal');
-
-    appendTerminalOutput('[SYSTEM] Project closed. All panels reset.');
   };
 
 
@@ -551,8 +547,53 @@ export default function App() {
     }
   }, [setTauriCommand, setTauriDialog, setTauriFs]);
 
+  // --- MCP AUTO-RECONNECT ENGINE ---
+  useEffect(() => {
+    const reconnectMcpServers = async () => {
+      // prevent re-loading if already running
+      const activeServers = mcpServers.filter(s => s.connected && (s.serverUrl || s.url));
+      if (activeServers.length === 0) return;
 
+      appendTerminalOutput('[SYSTEM] Memulai Auto-Connect ke MCP Servers tersimpan...');
+      
+      const updatedServers = [...mcpServers];
+      let hasChanges = false;
 
+      for (const server of activeServers) {
+        try {
+          appendTerminalOutput(`[SYSTEM] Re-connecting MCP '${server.name}' via ${server.type.toUpperCase()}...`);
+          const tools = await mcpManager.connect({
+            name: server.name,
+            serverUrl: server.serverUrl || server.url,
+            type: server.type as "sse" | "stdio",
+          });
+          
+          const idx = updatedServers.findIndex(s => s.name === server.name);
+          if (idx !== -1) {
+             updatedServers[idx] = { ...server, tools, connected: true };
+             hasChanges = true;
+          }
+          appendTerminalOutput(`[SYSTEM] ✅ MCP ${server.name} aktif (${tools.length} alat).`);
+        } catch (err: any) {
+          appendTerminalOutput(`[SYSTEM] ⚠️ Auto-koneksi MCP ${server.name} gagal (Offline/Timeout).`);
+          const idx = updatedServers.findIndex(s => s.name === server.name);
+          if (idx !== -1) {
+             updatedServers[idx] = { ...server, connected: false };
+             hasChanges = true;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        setMcpServers(updatedServers);
+      }
+    };
+
+    // run once after init
+    const timer = setTimeout(reconnectMcpServers, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('aura_mcp_servers', JSON.stringify(mcpServers));
@@ -570,6 +611,34 @@ export default function App() {
       setIsFetchingModels(false);
     }
   };
+
+  // --- NATIVE FS WATCHER INTEGRATION ---
+  const watchTimerRef = useRef<any>(null);
+  useEffect(() => {
+    let unlisten: any;
+    
+    const setupListener = async () => {
+      unlisten = await listen('aura://fs-event', (event) => {
+        console.log('[AURA WATCHER] Disk change detected:', event.payload);
+        
+        // Debounce sync to avoid spamming on mass changes (e.g. npm install)
+        if (watchTimerRef.current) clearTimeout(watchTimerRef.current);
+        watchTimerRef.current = setTimeout(() => {
+          if (nativeProjectPath) {
+            console.log('[AURA WATCHER] Triggering auto-sync...');
+            // We pass true to avoid resetting the active file while user is coding
+            syncFilesFromNativePath(nativeProjectPath, true);
+          }
+        }, 1500); 
+      });
+    };
+
+    setupListener();
+    return () => {
+      if (unlisten) unlisten();
+      if (watchTimerRef.current) clearTimeout(watchTimerRef.current);
+    };
+  }, [nativeProjectPath]);
 
   const relayout = (preset: 'default' | 'zen') => {
     if (preset === 'default') {
@@ -995,11 +1064,12 @@ Integrations:
     }
   };
 
-  const syncFilesFromNativePath = async (rootPath: string) => {
+  const syncFilesFromNativePath = async (rootPath: string, skipActiveFileReset: boolean = false) => {
     if (!tauriFs) return;
     const newFiles: FileItem[] = [];
 
-    const IGNORE_LIST = ['node_modules', '.git', '.next', 'dist', 'build', '.DS_Store', 'target', 'vendor'];
+    const IGNORE_LIST = ['node_modules', '.git', '.next', '.DS_Store', 'target', 'vendor'];
+    // Note: 'dist' and 'build' are REMOVED from ignore list per user request.
 
     async function scanNative(currentPath: string) {
       const entries = await tauriFs.readDir(currentPath);
@@ -1007,44 +1077,45 @@ Integrations:
         const fullPath = `${currentPath}/${entry.name}`;
         
         if (entry.isDirectory) {
-          // Skip ignored directories from recursive scan, but still show them as folder placeholders
           if (IGNORE_LIST.some(ignore => entry.name === ignore)) {
-            console.log(`[AURA FS] Showing placeholder for: ${entry.name}`);
-            // Add a placeholder file so the folder appears in the tree
             newFiles.push({
               id: fullPath + '/.aura-placeholder',
               name: '.aura-placeholder',
-              content: `// This folder (${entry.name}) is not scanned for performance reasons.`,
+              content: `// This folder (${entry.name}) is excluded from deep scan.`,
               language: 'plaintext'
             });
             continue;
           }
           await scanNative(fullPath);
         } else if (entry.isFile) {
-          const content = await tauriFs.readTextFile(fullPath);
-          const ext = entry.name.split('.').pop();
-          newFiles.push({
-            id: fullPath, 
-            name: entry.name,
-            content: content,
-            language: ext === 'ts' || ext === 'tsx' ? 'typescript' : ext === 'js' || ext === 'jsx' ? 'javascript' : ext || 'plaintext'
-          });
+          try {
+            const content = await tauriFs.readTextFile(fullPath);
+            const ext = entry.name.split('.').pop();
+            newFiles.push({
+              id: fullPath, 
+              name: entry.name,
+              content: content,
+              language: ext === 'ts' || ext === 'tsx' ? 'typescript' : ext === 'js' || ext === 'jsx' ? 'javascript' : ext || 'plaintext'
+            });
+          } catch (e) {
+            console.warn(`[AURA FS] Skip binary/unreadable: ${entry.name}`);
+          }
         }
       }
     }
 
     try {
       await scanNative(rootPath);
-      if (newFiles.length > 0) {
+      if (newFiles.length >= 0) {
         setFiles(newFiles);
-        setActiveFileId(newFiles[0].id);
+        if (!skipActiveFileReset && newFiles.length > 0) {
+          setActiveFileId(newFiles[0].id);
+        }
         const folderName = rootPath.split(/[\\/]/).pop() || rootPath;
         setProjectName(folderName.toUpperCase());
-        appendTerminalOutput(`[NATIVE] Sync lengkap: ${newFiles.length} file dimuat dari ${rootPath}`);
       }
     } catch (err: any) {
       console.error('Scan Native Error:', err);
-      appendTerminalOutput(`[ERROR] Gagal memindai folder: ${err.message}`);
     }
   };
 
@@ -1064,6 +1135,14 @@ Integrations:
       if (selected && typeof selected === 'string') {
         const normalizedPath = selected.replace(/\\/g, '/');
         
+        // Start Native Watcher
+        try {
+          await invoke('start_watcher', { path: normalizedPath });
+          console.log('[AURA] Native Watcher Enabled for:', normalizedPath);
+        } catch (e) {
+          console.error('[AURA] Failed to start watcher:', e);
+        }
+
         // --- MEMORY-TO-DISK SYNC (v2.4.2) ---
         if (files.length > 0 && !nativeProjectPath) {
            const shouldDump = window.confirm(
@@ -1336,8 +1415,17 @@ Integrations:
             name: projectName.toLowerCase().replace(/\s+/g, '-'),
             version: "1.0.0",
             private: true,
-            dependencies: {},
-            scripts: { "dev": "vite", "build": "vite build", "preview": "vite preview" }
+            scripts: { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+            dependencies: {
+              "react": "^19.0.0",
+              "react-dom": "^19.0.0"
+            },
+            devDependencies: {
+              "@vitejs/plugin-react": "^4.3.4",
+              "vite": "^6.0.0",
+              "tailwindcss": "^4.0.0",
+              "@tailwindcss/vite": "^4.0.0"
+            }
           };
           handleApplyCode('package.json', JSON.stringify(defaultPackageJson, null, 2), 'create_or_modify');
           appendOutput(`[SYSTEM] ✅ 'package.json' dibuat otomatis.`);
@@ -1886,14 +1974,8 @@ Integrations:
         isResizingSidebar={isResizingSidebar}
         setIsResizingSidebar={setIsResizingSidebar}
         setShowGuideModal={setShowGuideModal}
-        files={files}
-        setFiles={setFiles}
-        activeFileId={activeFileId}
-        setActiveFileId={setActiveFileId}
         fileSearchInput={fileSearchInput}
         setFileSearchInput={setFileSearchInput}
-        chatMessages={chatMessages}
-        setChatMessages={setChatMessages}
         composerMessages={composerMessages}
         setComposerMessages={setComposerMessages}
         chatInput={chatInput}
@@ -1963,8 +2045,6 @@ Integrations:
         context7Mode={context7Mode}
         setContext7Mode={setContext7Mode}
         resetAllConnections={resetAllConnections}
-        mcpServers={mcpServers}
-        setMcpServers={setMcpServers}
         selectedMcpTemplateIdx={selectedMcpTemplateIdx}
         setSelectedMcpTemplateIdx={setSelectedMcpTemplateIdx}
         mcpTemplateData={mcpTemplateData}
@@ -2176,7 +2256,7 @@ Integrations:
                  <iframe id="preview-iframe" src={previewUrl} className="flex-1 w-full bg-white border-none" title="App Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
                </div>
             ) : (
-              <AiComposerPanel 
+              <AiComposerV3 
                 provider={aiProvider}
                 apiKey={
                   aiProvider === 'gemini' ? geminiApiKey : 

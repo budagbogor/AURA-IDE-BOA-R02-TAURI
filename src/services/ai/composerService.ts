@@ -26,7 +26,7 @@ ${ELITE_DESIGN_PROMPT}
 3. **MANDATORY SCAFFOLDING (ANTI-CRASH VITE DIRECTORY)**: 
    - [TERMINAL HANG PROTOCOL]: DILARANG KERAS menggunakan perintah CLI \`npm create vite\` atau \`npx create-next-app\` via command terminal saat merespons! Exec CLI akan macet (*Cancel*) karena deteksi folder tidak kosong.
    - SEBAGAI GANTINYA: Jika Anda diminta membuat web / landing page dari NOL, ANDA WAJIB MENULISKAN LANGSUNG isi \`package.json\`, \`vite.config.ts\`, \`index.html\`, \`tsconfig.json\`, \`tsconfig.node.json\`, dan \`src/main.tsx\` secara harfiah (manual) ke dalam blok kode balasan Anda seperti merender file lainnya! Pastikan \`package.json\` memiliki \`"scripts": { "dev": "vite", "build": "vite build" }\`.
-   - Di akhir jawaban, sertakan satu baris instalasi \`\`\`command:npm install -D tailwindcss @tailwindcss/vite lucide-react framer-motion && npm install && npm run dev\`\`\` agar dependensi teraplikasikan dan localhost mengudara!
+   - Di akhir jawaban, sertakan satu baris instalasi \`\`\`command:npm install react react-dom && npm install -D vite @vitejs/plugin-react tailwindcss @tailwindcss/vite lucide-react framer-motion && npm run dev\`\`\` agar dependensi teraplikasikan dan localhost mengudara!
 
 FILE MODIFICATION RULES (SANGAT KETAT & HARGA MATI):
 1. Anda WAJIB MENGGUNAKAN TRIPLE BACKTICKS (\`\`\`) dengan awalan "file:path/nama-file.ext" untuk setiap file yang Anda buat atau ubah.
@@ -41,11 +41,22 @@ FILE MODIFICATION RULES (SANGAT KETAT & HARGA MATI):
 
 STRICT RULES:
 - Gunakan React 19 & Tailwind CSS v4.
-- [SANGAT FATAL] Jika Anda mengenerate "package.json" untuk project React/Vite dengan Tailwind v4, Anda WAJIB MENGISI "@tailwindcss/vite" dan "tailwindcss" ke dalam \`devDependencies\`. 
+- [SANGAT FATAL] Jika Anda mengenerate "package.json" untuk project React/Vite, Anda WAJIB MENGISI "react" dan "react-dom" di dalam \`dependencies\`, SERTA melengkapi \`devDependencies\` dengan "vite", "@vitejs/plugin-react", "tailwindcss", dan "@tailwindcss/vite". JANGAN lupakan @vitejs/plugin-react!
 - [SANGAT FATAL] Anda WAJIB membuat file \`src/index.css\` yang HANYA berisi: \`@import "tailwindcss";\` (ditambah custom css jika perlu) dan memastikan file ini di-import di \`src/main.tsx\`.
-- [SANGAT FATAL] Anda WAJIB mengkonfigurasi \`vite.config.ts\` untuk menggunakan \`@tailwindcss/vite\`: import tailwindcss dari '@tailwindcss/vite' lalu masukkan \`tailwindcss()\` ke dalam array \`plugins: []\`. Jika ini terlewat, UI akan polos tanpa CSS!
+- [SANGAT FATAL] Anda WAJIB mengkonfigurasi \`vite.config.ts\` untuk menggunakan \`@tailwindcss/vite\` (bersama plugin react). Contoh plugins: \`[react(), tailwindcss()]\`. Jika ini terlewat, Vite gagal atau UI polos!
 - Desain: Glassmorphism, Bento Grids, Dynamic Gradients, dan Smooth Animations (Framer Motion).
 - Jika output Anda terhenti karena limit token, katakan "LANJUTKAN [nama file]" di pesan berikutnya.
+
+=== AUTONOMOUS BRAIN (MCP MODEL CONTEXT PROTOCOL) ===
+Anda memiliki akses ke "ALAT" (TOOLS) sistem. Jika Anda butuh informasi yang tidak ada di konteks (seperti daftar file, isi database, atau pencarian web via MCP), Anda WAJIB memanggil tool tersebut.
+FORMAT PANGGILAN TOOL:
+\`\`\`call:mcp/nama_client/nama_tool
+{
+  "arg_name": "value"
+}
+\`\`\`
+Sistem akan otomatis mengeksekusi tool tersebut dan memberikan "OBSERVATION" kepada Anda. Jangan berasumsi hasil tool sebelum menerimanya.
+Setelah tool dipanggil, BERHENTILAH mengirim teks. Tunggu hasil "OBSERVATION" dari sistem.
 `;
 
 const DOMAIN_EXPERTISE: Record<string, string> = {
@@ -148,7 +159,9 @@ export async function* generateComposerStream(
   }
 
   const mcpContext = mcpTools.length > 0 
-    ? `=== MCP TOOLS TERSEDIA ===\nAnda memiliki akses ke tool berikut via sistem (Sebutkan jika Anda ingin user menjalankannya):\n${mcpTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}`
+    ? `=== MCP TOOLS TERSEDIA (AUTONOMOUS ACCESS) ===
+Anda memiliki akses LANGSUNG ke tool berikut. Gunakan format \`\`\`call:mcp/client/tool {args} \`\`\` untuk menjalankannya secara otonom:
+${mcpTools.map(t => `- ${t.clientName}/${t.name}: ${t.description} (Schema: ${JSON.stringify(t.inputSchema)})`).join('\n')}`
     : "";
 
   let effectiveCategory = category;
@@ -288,3 +301,23 @@ export function parseComposerResponse(fullResponse: string) {
 
   return files;
 }
+
+export function parseMcpToolCalls(fullResponse: string) {
+  const calls: { clientName: string; toolName: string; args: any }[] = [];
+  const blockRegex = /\`\`\`call:mcp\/([^\/]+)\/([^\n]+)\n([\s\S]*?)\`\`\`/g;
+  
+  let match;
+  while ((match = blockRegex.exec(fullResponse)) !== null) {
+    const clientName = match[1].trim();
+    const toolName = match[2].trim();
+    try {
+      const args = JSON.parse(match[3].trim());
+      calls.push({ clientName, toolName, args });
+    } catch (e) {
+      console.error("Failed to parse MCP arguments:", e);
+    }
+  }
+
+  return calls;
+}
+

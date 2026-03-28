@@ -20,6 +20,8 @@ import {
   AURA_COLLECTIVE, SUPER_CLAUDE_COMMANDS, MCP_TEMPLATES 
 } from '@/utils/constants';
 import { AiComposerPanel } from '../AiComposer/AiComposerPanel';
+import { mcpManager } from '../../services/mcpService';
+import { useAppStore } from '../../store/useAppStore';
 
 interface SidebarProps {
   layoutMode: 'classic' | 'modern';
@@ -32,14 +34,8 @@ interface SidebarProps {
   isResizingSidebar: boolean;
   setIsResizingSidebar: (isResizing: boolean) => void;
   setShowGuideModal: (show: boolean) => void;
-  files: FileItem[];
-  setFiles: (files: FileItem[] | ((prev: FileItem[]) => FileItem[])) => void;
-  activeFileId: string;
-  setActiveFileId: (id: string) => void;
   fileSearchInput: string;
   setFileSearchInput: (input: string) => void;
-  chatMessages: ChatMessage[];
-  setChatMessages: (messages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
   composerMessages: any[];
   setComposerMessages: React.Dispatch<React.SetStateAction<any[]>>;
   chatInput: string;
@@ -110,8 +106,6 @@ interface SidebarProps {
   setSelectedSkill: (skill: string) => void;
   context7Mode: boolean;
   setContext7Mode: (mode: boolean) => void;
-  mcpServers: McpServer[];
-  setMcpServers: React.Dispatch<React.SetStateAction<McpServer[]>>;
   selectedMcpTemplateIdx: number | 'custom';
   setSelectedMcpTemplateIdx: (idx: number | 'custom') => void;
   mcpTemplateData: Record<string, string>;
@@ -260,8 +254,8 @@ const TreeItem: React.FC<{
 export const Sidebar: React.FC<SidebarProps> = ({
   layoutMode, zenMode, showSidebar, sidebarTab, setSidebarTab,
   sidebarWidth, setSidebarWidth, isResizingSidebar, setIsResizingSidebar,
-  setShowGuideModal, files, setFiles, activeFileId, setActiveFileId,
-  fileSearchInput, setFileSearchInput, chatMessages, setChatMessages,
+  setShowGuideModal,
+  fileSearchInput, setFileSearchInput,
   composerMessages, setComposerMessages,
   chatInput, setChatInput, isAiLoading, handleSendMessage,
   attachedFiles, setAttachedFiles, removeAttachment, handleFileUpload,
@@ -284,7 +278,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   systemInstruction, setSystemInstruction, aiRules, setAiRules,
   selectedSkill, setSelectedSkill, context7Mode, setContext7Mode,
   resetAllConnections,
-  mcpServers, setMcpServers,
   selectedMcpTemplateIdx, setSelectedMcpTemplateIdx, mcpTemplateData, setMcpTemplateData,
   newMcpName, setNewMcpName, newMcpType, setNewMcpType,
   newMcpUrl, setNewMcpUrl, newMcpEnvStr, setNewMcpEnvStr,
@@ -297,7 +290,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeAgentId, setActiveAgentId,
   syncFilesFromNativePath
 }) => {
+  const { files, setFiles, activeFileId, setActiveFileId, chatMessages, setChatMessages, mcpServers, setMcpServers } = useAppStore();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRegisteringMcp, setIsRegisteringMcp] = useState(false);
+
+  const handleRegisterMcp = async () => {
+    if (!newMcpUrl) {
+      appendTerminalOutput("[ERROR] URL / Endpoint MCP Server tidak boleh kosong.");
+      return;
+    }
+    
+    setIsRegisteringMcp(true);
+    try {
+      const type = newMcpUrl.startsWith('http') ? 'sse' : 'stdio';
+      const name = newMcpName || newMcpType || `Server-${Math.random().toString(36).substr(2, 5)}`;
+      
+      appendTerminalOutput(`[SYSTEM] Menghubungkan ke MCP Server '${name}' via ${type.toUpperCase()}...`);
+      const tools = await mcpManager.connect({
+        name,
+        serverUrl: newMcpUrl,
+        type,
+      });
+
+      setMcpServers(prev => {
+        const filtered = prev.filter(s => s.name !== name);
+        return [...filtered, {
+          name,
+          connected: true,
+          type,
+          url: newMcpUrl,
+          tools
+        }];
+      });
+      
+      appendTerminalOutput(`[SYSTEM] ✅ Berhasil meregister MCP Server: ${name} (${tools.length} alat tersedia).`);
+      setNewMcpUrl('');
+      setNewMcpType('sse');
+      setNewMcpName('');
+    } catch (err: any) {
+      appendTerminalOutput(`[ERROR] Gagal menyambung ke MCP: ${err.message}`);
+    } finally {
+      setIsRegisteringMcp(false);
+    }
+  };
 
   const handleRefresh = async () => {
     if (!nativeProjectPath || isSyncing) return;
@@ -961,9 +996,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
 
                     <button 
-                      className="w-full py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-[10px] font-bold rounded-xl shadow-lg shadow-orange-500/10 transition-all flex items-center justify-center gap-2"
+                      onClick={handleRegisterMcp}
+                      disabled={isRegisteringMcp}
+                      className={cn(
+                        "w-full py-1.5 text-white text-[10px] font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2",
+                        isRegisteringMcp ? "bg-gray-600 cursor-not-allowed" : "bg-orange-600 hover:bg-orange-500 shadow-orange-500/10"
+                      )}
                     >
-                      <Plus size={12} /> Register MCP Server
+                      {isRegisteringMcp ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />} 
+                      {isRegisteringMcp ? 'Connecting...' : 'Register MCP Server'}
                     </button>
                     
                     <div className="pt-1.5 border-t border-white/5 space-y-1.5">
