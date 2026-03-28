@@ -9,6 +9,7 @@ export const useLayout = () => {
   const [zenMode, setZenMode] = useState(false);
   const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [showAiPanel, setShowAiPanel] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('files');
   const [bottomTab, setBottomTab] = useState<BottomTab>('terminal');
   const [context7Mode, setContext7Mode] = useState(false);
@@ -60,8 +61,9 @@ export const useLayout = () => {
         if (newWidth > 150 && newWidth < 900) setSidebarWidth(newWidth);
       }
       if (isResizingBottom) {
-        const newHeight = window.innerHeight - e.clientY - 44; 
-        if (newHeight > 60 && newHeight < window.innerHeight - 100) setBottomHeight(newHeight);
+        let footerOffset = 44;
+        const newHeight = window.innerHeight - e.clientY - footerOffset; 
+        if (newHeight >= 60 && newHeight <= window.innerHeight - 50) setBottomHeight(newHeight);
       }
       if (isResizingAiPanel) {
         let newWidth;
@@ -79,6 +81,7 @@ export const useLayout = () => {
       setIsResizingBottom(false);
       setIsResizingAiPanel(false);
       document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
     };
 
     if (isResizingSidebar || isResizingBottom || isResizingAiPanel) {
@@ -109,6 +112,7 @@ export const useLayout = () => {
     zenMode, setZenMode,
     showBottomPanel, setShowBottomPanel,
     showAiPanel, setShowAiPanel,
+    showSidebar, setShowSidebar,
     sidebarTab, setSidebarTab,
     bottomTab, setBottomTab,
     context7Mode, setContext7Mode,

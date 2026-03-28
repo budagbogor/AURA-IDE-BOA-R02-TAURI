@@ -1,0 +1,8 @@
+No,Guideline_Type,Value,Constraint,Priority,Context,Implementation_Tip
+1,Spacing Rhythm,8dp (Multiples of 8),Consistent multiples of 8 (8/16/24/32/48/64),CRITICAL,All UI Layouts,"Use padding/gap in 8px increments. E.g., gap: 1rem (16px), p-4 (16px)."
+2,Transition Timing,150-300ms,Fast for interactive / Medium for page,HIGH,Hover and State Changes,"150ms for micro-interactions (press), 200-250ms for hover, 300ms for modals."
+3,Micro-Animations,Spring / Bezier,Avoid linear animations,MEDIUM,Interaction Feedback,"Use 'cubic-bezier(0.4, 0, 0.2, 1)' or spring-like bounces for premium feel."
+4,Typography Ratio,1.25 (Major Third),Consistent scale,HIGH,Content Hierarchy,"Base 16px -> 20px -> 25px -> 31px -> 39px. Use 400 for body, 600/700 for headings."
+5,Interactive Targets,44px Minimum,Touch accessibility,HIGH,Mobile and Desktop,"Ensure all buttons/links have a hit area of at least 44x44px, even if visual is smaller."
+6,Color Contrast,4.5:1 (AA) / 7:1 (AAA),Accessibility requirement,CRITICAL,Text Readability,"Check text over background using contrast tools. No light grey on white."
+10,Shadow Depth,Layered / Natural,Avoid single hard shadows,MEDIUM,Depth and Elevation,"Use 2-3 layers of soft shadows. E.g., '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.05)'."

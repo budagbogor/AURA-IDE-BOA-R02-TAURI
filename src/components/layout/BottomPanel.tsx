@@ -78,15 +78,15 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
         return (
           <div className="flex-1 flex flex-col font-mono text-[13px] h-full overflow-hidden bg-[#0a0a0a]">
             {/* Terminal Tabs Workspace */}
-            <div className="flex items-center gap-1 border-b border-white/5 bg-black/40 px-2 py-1">
+            <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-1.5 overflow-x-auto scrollbar-hide">
               {terminalSessions.map(s => (
                 <div 
                    key={s.id}
                    onClick={() => setActiveTerminalId(s.id)}
                    className={cn(
-                     "group flex items-center gap-2 px-3 py-1 rounded-md cursor-pointer transition-all text-[11px] font-medium border border-transparent",
+                     "group flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer transition-all duration-200 text-[11px] font-medium border border-transparent shrink-0",
                      activeTerminalId === s.id 
-                       ? "bg-blue-600/20 text-blue-400 border-blue-500/30" 
+                       ? "bg-blue-600/20 text-blue-400 border-blue-500/30 pro-max-glow ring-1 ring-blue-500/10" 
                        : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
                    )}
                 >
@@ -261,13 +261,14 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
           e.preventDefault();
           setIsResizingBottom(true);
           document.body.style.cursor = 'row-resize';
+          document.body.style.userSelect = 'none';
         }}
         className={cn(
-          "absolute -top-1 left-0 right-0 h-2 cursor-row-resize z-[100] group/resizer",
-          "hover:bg-blue-500/40 transition-all duration-300"
+          "absolute -top-3 left-0 right-0 h-6 cursor-row-resize z-[100] group/resizer flex justify-center",
+          "hover:bg-blue-500/20 transition-all duration-300"
         )}
       >
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-1 bg-white/10 rounded-full opacity-0 group-hover/resizer:opacity-100 transition-opacity" />
+         <div className="mt-1 w-20 h-1.5 bg-white/20 group-hover/resizer:bg-blue-400/80 rounded-full transition-colors drop-shadow-lg shadow-black/50" />
       </div>
       
       <div className="flex items-center gap-4 px-4 py-1 text-[11px] uppercase font-bold text-[#858585] border-b border-white/5 shrink-0">

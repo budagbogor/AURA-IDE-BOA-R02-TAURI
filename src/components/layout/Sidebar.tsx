@@ -24,6 +24,7 @@ import { AiComposerPanel } from '../AiComposer/AiComposerPanel';
 interface SidebarProps {
   layoutMode: 'classic' | 'modern';
   zenMode: boolean;
+  showSidebar: boolean;
   sidebarTab: 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database' | 'auditor';
   setSidebarTab: (tab: 'files' | 'search' | 'git' | 'ai' | 'github' | 'settings' | 'database' | 'auditor') => void;
   sidebarWidth: number;
@@ -257,7 +258,7 @@ const TreeItem: React.FC<{
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  layoutMode, zenMode, sidebarTab, setSidebarTab,
+  layoutMode, zenMode, showSidebar, sidebarTab, setSidebarTab,
   sidebarWidth, setSidebarWidth, isResizingSidebar, setIsResizingSidebar,
   setShowGuideModal, files, setFiles, activeFileId, setActiveFileId,
   fileSearchInput, setFileSearchInput, chatMessages, setChatMessages,
@@ -347,7 +348,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  if (zenMode) return null;
+  if (zenMode || !showSidebar) return null;
 
   return (
     <>
@@ -359,7 +360,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div 
           onClick={() => setSidebarTab('files')}
           title="Explorer (Ctrl+Shift+E)"
-          className={cn("p-2 cursor-pointer transition-all duration-200 rounded-xl group relative", sidebarTab === 'files' ? "text-white bg-blue-600/20 shadow-lg shadow-blue-500/10" : "text-[#858585] hover:text-white hover:bg-white/5")}
+          className={cn(
+            "p-2 cursor-pointer transition-all duration-200 rounded-xl group relative", 
+            sidebarTab === 'files' ? "text-white bg-blue-600/20 shadow-lg shadow-blue-500/10 pro-max-glow" : "text-[#858585] hover:text-white hover:bg-white/5"
+          )}
         >
           <FileCode size={20} className={cn("transition-transform duration-200", sidebarTab === 'files' && "scale-110")} />
           {sidebarTab === 'files' && <motion.div layoutId="activeTab" className="absolute left-[-12px] w-1 h-8 bg-blue-500 rounded-r-full" />}
@@ -434,7 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         exit={{ width: 0, opacity: 0 }}
         style={{ width: sidebarWidth }}
         className={cn(
-          "bg-[#252526] h-full flex flex-col overflow-hidden relative transition-[width] duration-75 shrink-0",
+          "bg-[#0f0f10] h-full flex flex-col overflow-hidden relative transition-[width] duration-150 shrink-0",
           layoutMode === 'modern' ? "border-l border-white/5" : "border-r border-white/5"
         )}
       >

@@ -135,16 +135,20 @@ export const TerminalAdapter: React.FC<TerminalAdapterProps> = ({
     }
   }, [onData]);
 
-  // Handle resizing gracefully
+  // Handle resizing gracefully (OS window scale & dragging panel)
   useEffect(() => {
     const handleResize = () => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
+      if (fitAddonRef.current) fitAddonRef.current.fit();
     };
     window.addEventListener('resize', handleResize);
+    
+    // Manual refit on height prop change (drag)
+    if (fitAddonRef.current) {
+      setTimeout(() => fitAddonRef.current?.fit(), 10);
+    }
+    
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [height]);
 
   return (
     <div 

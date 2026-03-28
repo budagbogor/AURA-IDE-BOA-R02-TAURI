@@ -89,6 +89,7 @@ import {
   MCP_TEMPLATES 
 } from '@/utils/constants';
 import { getGeminiAI, generateGeminiStream } from './services/geminiService';
+import { getUXContext } from './services/ai/ux-skill/uxSkillService';
 import { generateOpenRouterContent, fetchFreeModels, type OpenRouterModel } from './services/openRouterService';
 import { generateBytezContent } from './services/bytezService';
 import { fetchUserRepos, cloneRepository, pushProjectToGitHub, fetchUserProfile } from './services/githubService';
@@ -178,6 +179,7 @@ export default function App() {
     zenMode, setZenMode,
     showBottomPanel, setShowBottomPanel,
     showAiPanel, setShowAiPanel,
+    showSidebar, setShowSidebar,
     sidebarTab, setSidebarTab,
     bottomTab, setBottomTab,
     context7Mode, setContext7Mode,
@@ -241,6 +243,44 @@ export default function App() {
   useEffect(() => {
     terminalCwdRef.current = nativeProjectPath;
   }, [nativeProjectPath]);
+
+  // --- GLOBAL KEYBOARD SHORTCUTS (v11.0.35) ---
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Toggle Sidebar: Ctrl+B
+      if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        e.preventDefault();
+        setShowSidebar(prev => !prev);
+      }
+      // Toggle Terminal: Ctrl+`
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        setShowBottomPanel(prev => !prev);
+      }
+      // File Search: Ctrl+P
+      if (e.ctrlKey && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        e.preventDefault();
+        setShowFileSearch(true);
+      }
+      // Command Palette: Ctrl+Shift+P
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      }
+      // Save File: Ctrl+S
+      if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (activeFile) {
+          handleSaveFile();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [activeFile, nativeProjectPath]);
 
   const [mcpServers, setMcpServers] = useState<any[]>(() => {
     const saved = localStorage.getItem('aura_mcp_servers');
@@ -639,24 +679,29 @@ export default function App() {
   const handleSendMessage = async () => {
     if ((!chatInput.trim() && attachedFiles.length === 0) || isAiLoading) return;
 
-    // --- SMART PERSONA ORCHESTRATOR (v8.0.0-Elite) ---
+    // --- SMART PERSONA ORCHESTRATOR (v11.0.35-Elite) ---
     const lowerInput = chatInput.toLowerCase();
     let detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'pm'); // Default Orchestrator
     
-    if (lowerInput.match(/ui|design|style|css|color|aesthetic|glassmorphism|bento|palette/)) {
-      detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'uiux');
-    } else if (lowerInput.match(/error|debug|bug|crash|fix|troubleshoot|rca|failed/)) {
+    const uiRegex = /ui|design|style|css|color|aesthetic|glassmorphism|bento|palette|gradient|animation|mobile|dark mode|light mode|theme|ux|uiux|ritme|spacing|rhythm/;
+    const debugRegex = /error|debug|bug|crash|fix|troubleshoot|rca|failed|not working|missing|undefined|null|timeout|loop/;
+    const archRegex = /architect|structure|solid|pattern|scalability|design pattern|refactor|clean code|modular|folder|structure|blueprint/;
+    const securityRegex = /security|vulnerability|auth|encrypt|audit|leak|cors|headers|jwt|cookie|sanitize/;
+
+    if (lowerInput.match(uiRegex)) {
+      detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'uiux_pro'); // Auto-upgrade to Pro
+    } else if (lowerInput.match(debugRegex)) {
       detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'debugger');
-    } else if (lowerInput.match(/architect|structure|solid|pattern|scalability|design pattern/)) {
+    } else if (lowerInput.match(archRegex)) {
       detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'architect');
-    } else if (lowerInput.match(/security|vulnerability|auth|encrypt|audit|leak/)) {
+    } else if (lowerInput.match(securityRegex)) {
       detectedAgent = AURA_COLLECTIVE.find(a => a.id === 'security');
     }
 
-    if (detectedAgent && detectedAgent.name !== selectedSkill) {
+    if (detectedAgent && detectedAgent.name !== (activeAgentId || selectedSkill)) {
       setSelectedSkill(detectedAgent.name);
       setActiveAgentId(detectedAgent.id);
-      appendTerminalOutput(`[AURA SWARM] Switching to ${detectedAgent.name} for this task...`);
+      appendTerminalOutput(`[AURA SWARM] Detecting intent: ${detectedAgent.id.toUpperCase()}. Switching to ${detectedAgent.name}...`);
     }
 
     const userMsg: ChatMessage = { role: 'user', content: chatInput };
@@ -669,6 +714,12 @@ export default function App() {
       const currentSkill = AURA_COLLECTIVE.find(s => s.name === (detectedAgent?.name || selectedSkill));
       const skillInstruction = currentSkill ? currentSkill.instruction : '';
       
+      // UX Pro Max Context Injection
+      let uxContext = '';
+      if (currentSkill?.id === 'uiux' || currentSkill?.id === 'uiux_pro') {
+        uxContext = await getUXContext();
+      }
+
       // Check for commands in input
       let activeCommandInstruction = '';
       const command = SUPER_CLAUDE_COMMANDS.find(c => chatInput.trim().startsWith(c.command));
@@ -722,6 +773,7 @@ Integrations:
             ${skillInstruction ? `\nSkill Focus: ${skillInstruction}` : ''}
             ${aiRules ? `\nUser Rules: ${aiRules}` : ''}
             ${activeCommandInstruction}
+            ${uxContext}
             ${deepContext}
             
             Current File: ${activeFile?.name || 'None'} (${activeFile?.language || 'None'})
@@ -738,62 +790,74 @@ Integrations:
         }
       });
 
-      if (aiProvider === 'gemini') {
-        const apiKey = geminiApiKey || process.env.GEMINI_API_KEY || '';
-        
-        // Initial empty assistant message
-        const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
-        setChatMessages(prev => [...prev, assistantMsg]);
-        
-        let fullResponse = '';
+      const providers = [aiProvider, 'gemini', 'openrouter', 'sumopod'].filter((v, i, a) => a.indexOf(v) === i); // Priority list
+      let success = false;
+      let lastError = '';
+
+      for (const currentProvider of providers) {
         try {
-          const stream = generateGeminiStream(apiKey, selectedModel, prompt, attachedFiles, chatMessages);
-          let lastUpdateTime = Date.now();
-          
-          for await (const chunk of stream) {
-            fullResponse += chunk;
-            const now = Date.now();
-            if (now - lastUpdateTime > 50) {
-              setChatMessages(prev => {
-                const newMsgs = [...prev];
-                newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
-                return newMsgs;
-              });
-              lastUpdateTime = now;
+          if (currentProvider === 'gemini') {
+            const apiKey = geminiApiKey || process.env.GEMINI_API_KEY || '';
+            if (!apiKey) continue;
+            
+            const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
+            setChatMessages(prev => [...prev, assistantMsg]);
+            
+            let fullResponse = '';
+            const stream = generateGeminiStream(apiKey, selectedModel, prompt, attachedFiles, chatMessages);
+            let lastUpdateTime = Date.now();
+            
+            for await (const chunk of stream) {
+              fullResponse += chunk;
+              const now = Date.now();
+              if (now - lastUpdateTime > 50) {
+                setChatMessages(prev => {
+                  const newMsgs = [...prev];
+                  newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
+                  return newMsgs;
+                });
+                lastUpdateTime = now;
+              }
             }
+            setChatMessages(prev => {
+              const newMsgs = [...prev];
+              newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
+              return newMsgs;
+            });
+            success = true;
+          } else if (currentProvider === 'openrouter') {
+            const apiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || '';
+            if (!apiKey) continue;
+            appendTerminalOutput(`[AURA FAILBACK] Trying OpenRouter fallback...`);
+            const content = await generateOpenRouterContent(openRouterModel, prompt, apiKey, attachedFiles, chatMessages);
+            setChatMessages(prev => [...prev, { role: 'assistant', content: content }]);
+            success = true;
+          } else if (currentProvider === 'sumopod') {
+            const apiKey = sumopodApiKey || process.env.SUMOPOD_API_KEY || '';
+            if (!apiKey) continue;
+            appendTerminalOutput(`[AURA FAILBACK] Trying SumoPod fallback...`);
+            const content = await generateSumopodContent(apiKey, sumopodModel, [
+              { role: 'system', content: `${systemInstruction}\nRules:\n${aiRules}\n${activeCommandInstruction}` },
+              ...chatMessages.map(m => ({ role: m.role as any, content: m.content })),
+              { role: 'user', content: prompt }
+            ]);
+            setChatMessages(prev => [...prev, { role: 'assistant', content: content }]);
+            success = true;
           }
-          
-          // Final update to guarantee the last chunk is rendered
-          setChatMessages(prev => {
-            const newMsgs = [...prev];
-            newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: fullResponse };
-            return newMsgs;
-          });
-        } catch (streamErr: any) {
-          console.error('Stream Error:', streamErr);
-          setChatMessages(prev => {
-            const newMsgs = [...prev];
-            newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: `Error: ${streamErr.message}` };
-            return newMsgs;
-          });
+
+          if (success) break;
+        } catch (providerErr: any) {
+          console.warn(`Provider ${currentProvider} failed:`, providerErr);
+          lastError = providerErr.message || 'Unknown error';
+          // If gemini fails mid-stream, cleanup the empty message before next provider
+          if (currentProvider === 'gemini') {
+            setChatMessages(prev => prev.filter(m => m.content !== ''));
+          }
         }
-      } else if (aiProvider === 'bytez') {
-        const googleKey = geminiApiKey || process.env.GEMINI_API_KEY || '';
-        content = await generateBytezContent(bytezModel, prompt, bytezApiKey, googleKey, attachedFiles, chatMessages);
-        setChatMessages(prev => [...prev, { role: 'assistant', content: content }]);
-      } else if (aiProvider === 'sumopod') {
-        if (!sumopodApiKey) throw new Error('SumoPod API Key is required. Please set it in Settings.');
-        content = await generateSumopodContent(sumopodApiKey, sumopodModel, [
-          { role: 'system', content: `${systemInstruction}\nRules:\n${aiRules}\n${activeCommandInstruction}` },
-          ...chatMessages.map(m => ({ role: m.role as any, content: m.content })),
-          { role: 'user', content: prompt }
-        ]);
-        setChatMessages(prev => [...prev, { role: 'assistant', content: content }]);
-      } else {
-        const apiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || '';
-        if (!apiKey) throw new Error('OpenRouter API Key is missing. Please set it in Settings.');
-        content = await generateOpenRouterContent(openRouterModel, prompt, apiKey, attachedFiles, chatMessages);
-        setChatMessages(prev => [...prev, { role: 'assistant', content: content }]);
+      }
+
+      if (!success) {
+        throw new Error(`All AI providers failed. Last error: ${lastError}`);
       }
 
       setAttachedFiles([]); // Clear attachments after sending
@@ -1617,7 +1681,7 @@ Integrations:
             </div>
             <div className="h-[1px] bg-white/5 my-1 mx-2"></div>
             <div className="px-3 py-1.5 flex items-center gap-2 text-white/40 cursor-default">
-              <Info size={14} /> <span className="text-[10px]">AURA AI IDE v3.1.1-PRO</span>
+              <Info size={14} /> <span className="text-[10px]">AURA AI IDE v11.0.35-PRO</span>
             </div>
           </div>
         </div>
@@ -1827,6 +1891,7 @@ Integrations:
       <Sidebar
         layoutMode={layoutMode}
         zenMode={zenMode}
+        showSidebar={showSidebar}
         sidebarTab={sidebarTab}
         setSidebarTab={setSidebarTab}
         sidebarWidth={sidebarWidth}

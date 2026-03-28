@@ -22,8 +22,8 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
               <Bot size={28} className="text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">AURA AI IDE v5.6.0</h2>
-              <p className="text-[#858585] text-sm mt-1">The Next Generation AI-Powered Development Environment</p>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">AURA AI IDE v11.0.35</h2>
+              <p className="text-[#858585] text-sm mt-1">The Next Generation AI-Powered "Zero-Click" IDE</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-[#858585] hover:text-white hover:bg-white/10 rounded-lg transition-colors">
@@ -61,6 +61,13 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     <div>
                       <h4 className="text-sm font-medium text-white mb-1">Context7 Mode</h4>
                       <p className="text-xs text-[#858585] leading-relaxed">Berikan AI pemahaman mendalam tentang seluruh arsitektur proyek Anda secara otomatis.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors pro-max-glow">
+                    <div className="mt-1"><Sparkles size={16} className="text-blue-400" /></div>
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-1">UI/UX Pro Max Intelligence</h4>
+                      <p className="text-xs text-[#858585] leading-relaxed">AI kini memiliki basis data desain elite (&gt;160 pola) untuk menyarankan style, spacing 8dp, dan transisi premium.</p>
                     </div>
                   </div>
                 </div>

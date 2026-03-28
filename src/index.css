@@ -4,17 +4,36 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* UI/UX Pro Max Spacing Rhythm (8dp) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* UI/UX Pro Max Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 @layer base {
   html, body, #root {
     @apply h-[100dvh] w-full m-0 p-0 overflow-hidden;
+    scroll-behavior: smooth;
   }
   body {
-    @apply bg-[#1e1e1e] text-[#cccccc] font-sans antialiased;
+    @apply bg-[#0a0a0a] text-[#ededef] font-sans antialiased;
   }
   button, a, [role="button"], summary {
     cursor: pointer;
+    @apply transition-all duration-150;
+  }
+  button:active, [role="button"]:active {
+    @apply scale-[0.98];
   }
   button:disabled, a[disabled], [role="button"][disabled] {
     cursor: not-allowed;
@@ -30,18 +49,33 @@
   }
   .glass-card {
     @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+    @apply transition-all duration-300;
+  }
+  .glass-card:hover {
+    @apply bg-white/[0.08] border-white/20;
   }
   .bg-aura-gradient {
-    background: linear-gradient(145deg, rgba(0, 122, 204, 0.1) 0%, rgba(30, 30, 30, 0.5) 100%);
+    background: linear-gradient(145deg, rgba(59, 130, 246, 0.1) 0%, rgba(10, 10, 10, 0.5) 100%);
   }
   .bg-aura-glow {
-    background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+    background: radial-gradient(circle at 50% 0%, rgba(94, 106, 210, 0.15) 0%, transparent 70%);
   }
   .text-glow-blue {
-    text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+    text-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
   }
   .text-glow-emerald {
-    text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    text-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+  }
+  .pro-max-glow {
+    @apply relative overflow-hidden;
+  }
+  .pro-max-glow::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-blue-500/0 via-white/10 to-blue-500/0 -translate-x-full;
+    animation: shimmer 3s infinite;
+  }
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
@@ -65,7 +99,7 @@
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  transition: background 0.3s;
+  transition: background var(--transition-normal);
 }
 
 ::-webkit-scrollbar-thumb:hover {
