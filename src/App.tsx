@@ -2349,6 +2349,8 @@ export default function App() {
                 systemInstruction={systemInstruction}
                 aiRules={aiRules}
                 aiTemperature={aiTemperature}
+                selectedSkill={selectedSkill}
+                setSelectedSkill={setSelectedSkill}
               />
             )}
           </div>

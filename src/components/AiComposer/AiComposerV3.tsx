@@ -41,6 +41,8 @@ interface AiComposerV3Props {
   systemInstruction: string;
   aiRules: string;
   aiTemperature: number;
+  selectedSkill: string;
+  setSelectedSkill: (skill: string) => void;
 }
 
 export const AiComposerV3: React.FC<AiComposerV3Props> = ({
@@ -48,14 +50,13 @@ export const AiComposerV3: React.FC<AiComposerV3Props> = ({
   onSuccess, projectTree, messages, setMessages,
   autoFixTrigger, autoFixMessage, onExecuteCommand, onApplyCode,
   nativeProjectPath, mcpTools, ollamaUrl, activeAgentId,
-  systemInstruction, aiRules, aiTemperature
+  systemInstruction, aiRules, aiTemperature,
+  selectedSkill, setSelectedSkill
 }) => {
   const [input, setInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const category = 'Full Stack'; // Default for V3
-
   const { runAutonomousLoop, isLooping } = useAutonomousAI(
-    provider, apiKey, model, files, category, activeFileId, 
+    provider, apiKey, model, files, selectedSkill, activeFileId, 
     projectTree, mcpTools, ollamaUrl, systemInstruction, aiRules, aiTemperature,
     setMessages, appendTerminalOutput, onApplyCode, onSuccess
   );
@@ -131,17 +132,39 @@ export const AiComposerV3: React.FC<AiComposerV3Props> = ({
                      {msg.content}
                   </div>
                 ) : (
-                  <Markdown>
-                    {msg.content
-                      .replace(/```(file|delete|javascript|typescript|json|css|html):([^\n]+)\n([\s\S]*?)(?:```|$)/g, (match, type, path) => {
-                        // Jika ada path (ada titik atau slash), anggap ini upaya menulis file
-                        if (path.includes('.') || path.includes('/') || type === 'file' || type === 'delete') {
-                           return `\n> 📦 **${path}** *(Kode telah dikirim ke Editor Tengah)*\n`;
+                  <div className="overflow-hidden break-words prose prose-invert prose-sm max-w-none">
+                    <Markdown 
+                      components={{
+                        pre: ({node, ...props}) => (
+                          <div className="overflow-x-auto my-2 rounded-lg bg-black/30 p-2 scrollbar-thin scrollbar-thumb-white/10">
+                            <pre {...props} />
+                          </div>
+                        ),
+                        code: ({node, className, children, ...props}) => {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !match ? (
+                            <code className="bg-white/10 rounded px-1 py-0.5 text-xs font-mono" {...props}>
+                              {children}
+                            </code>
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
                         }
-                        return match;
-                      })
-                      .replace(/```call:mcp\/([^\/]+)\/([^\n]+)\n([\s\S]*?)(?:```|$)/g, '\n> 🛠️ **Otonom Tool: $2** \n')}
-                  </Markdown>
+                      }}
+                    >
+                      {msg.content
+                        .replace(/```(file|delete|javascript|typescript|json|css|html):([^\n]+)\n([\s\S]*?)(?:```|$)/g, (match, type, path) => {
+                          // Jika ada path (ada titik atau slash), anggap ini upaya menulis file
+                          if (path.includes('.') || path.includes('/') || type === 'file' || type === 'delete') {
+                             return `\n> 📦 **${path}** *(Kode telah dikirim ke Editor Tengah)*\n`;
+                          }
+                          return match;
+                        })
+                        .replace(/```call:mcp\/([^\/]+)\/([^\n]+)\n([\s\S]*?)(?:```|$)/g, '\n> 🛠️ **Otonom Tool: $2** \n')}
+                    </Markdown>
+                  </div>
                 )}
               </div>
             </motion.div>
@@ -184,9 +207,30 @@ export const AiComposerV3: React.FC<AiComposerV3Props> = ({
         </div>
         
         <div className="flex items-center justify-between text-[10px] text-white/40 px-1">
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-4 items-center">
             <span className="flex items-center gap-1"><Paperclip size={10} /> {files.length} Files Context</span>
-            <span className="flex items-center gap-1 font-bold text-emerald-500/60"><CheckCircle size={10} /> AI Agent: {activeAgentId.toUpperCase()}</span>
+            
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 border border-white/10 rounded-lg group/skill hover:border-blue-500/30 transition-all cursor-pointer">
+              <Cpu size={10} className="text-blue-400" />
+              <select 
+                value={selectedSkill}
+                onChange={(e) => setSelectedSkill(e.target.value)}
+                className="bg-transparent border-none outline-none text-[10px] text-blue-400 font-bold cursor-pointer appearance-none hover:text-blue-300"
+              >
+                <option value="Auto">Auto Detect</option>
+                <option value="Full Stack">Full Stack</option>
+                <option value="Frontend">Frontend</option>
+                <option value="Backend">Backend</option>
+                <option value="Mobile App">Mobile App</option>
+                <option value="Tauri Desktop">Tauri Expert</option>
+                <option value="Chrome Extension">Chrome Extension</option>
+                <option value="Python Automation">Python Master</option>
+                <option value="AI Integration">AI Architect</option>
+                <option value="Game Dev">Game Dev</option>
+              </select>
+            </div>
+
+            <span className="flex items-center gap-1 font-bold text-emerald-500/60"><CheckCircle size={10} /> Agent: {activeAgentId.toUpperCase()}</span>
           </div>
           <div className="flex gap-2">
              <span className="flex items-center gap-1"><Sparkles size={10} /> Autonomy Mode</span>

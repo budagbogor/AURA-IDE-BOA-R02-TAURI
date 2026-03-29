@@ -188,9 +188,11 @@ ${mcpTools.map(t => `- ${t.clientName}/${t.name}: ${t.description} (Schema: ${JS
   const categorySkill = DOMAIN_EXPERTISE[effectiveCategory] || '';
 
   const completePrompt = `
-${systemInstruction ? `### SYSTEM INSTRUCTION:\n${systemInstruction}\n` : COMPOSER_SYSTEM_PROMPT}
+${COMPOSER_SYSTEM_PROMPT}
 
-${aiRules ? `### CRITICAL RULES:\n${aiRules}\n` : ''}
+${systemInstruction ? `### USER CHARACTER OVERLAY (INSTRUKSI TAMBAHAN):\n${systemInstruction}\n` : ''}
+
+${aiRules ? `### CRITICAL SYSTEM RULES (HARUS DIPATUHI):\n${aiRules}\n` : ''}
 
 ${categorySkill ? ` \n### APPLIED AUTO-DETECTED SKILL [${effectiveCategory}]:\n${categorySkill}\n` : ''}
 
