@@ -102,6 +102,8 @@ interface SidebarProps {
   setSystemInstruction: (inst: string) => void;
   aiRules: string;
   setAiRules: (rules: string) => void;
+  aiTemperature: number;
+  setAiTemperature: (temp: number) => void;
   selectedSkill: string;
   setSelectedSkill: (skill: string) => void;
   context7Mode: boolean;
@@ -276,6 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   openRouterApiKey, setOpenRouterApiKey, openRouterModel, setOpenRouterModel,
   dynamicFreeModels, isFetchingModels, refreshModels,
   systemInstruction, setSystemInstruction, aiRules, setAiRules,
+  aiTemperature, setAiTemperature,
   selectedSkill, setSelectedSkill, context7Mode, setContext7Mode,
   resetAllConnections,
   selectedMcpTemplateIdx, setSelectedMcpTemplateIdx, mcpTemplateData, setMcpTemplateData,
@@ -894,6 +897,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </div>
                         )}
                     </div>
+
+                    {/* Advanced Settings */}
+                    <div className="space-y-3 pt-3 border-t border-white/5">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">System Instruction (Base Character)</label>
+                        <textarea
+                          value={systemInstruction}
+                          onChange={(e) => setSystemInstruction(e.target.value)}
+                          placeholder="Anda adalah Senior Frontend Developer..."
+                          className="w-full bg-[#3c3c3c] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none text-white focus:border-purple-500/50 resize-y min-h-[60px] custom-scrollbar"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">System Rules</label>
+                        <textarea
+                          value={aiRules}
+                          onChange={(e) => setAiRules(e.target.value)}
+                          placeholder="- Gunakan komponen modular\n- Jangan halusinasi module..."
+                          className="w-full bg-[#3c3c3c] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none text-white focus:border-purple-500/50 resize-y min-h-[60px] custom-scrollbar"
+                        />
+                      </div>
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between items-center px-1">
+                          <label className="text-[9px] font-bold text-gray-500 uppercase">Temperature</label>
+                          <span className="text-[10px] text-purple-400 font-mono font-bold w-6 text-right">{aiTemperature}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="0.1"
+                          value={aiTemperature}
+                          onChange={(e) => setAiTemperature(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-500 mt-1"
+                        />
+                        <div className="flex justify-between text-[9px] text-gray-600 px-1 mt-1 font-medium">
+                          <span>Precise</span>
+                          <span>Creative</span>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
 
                 </section>

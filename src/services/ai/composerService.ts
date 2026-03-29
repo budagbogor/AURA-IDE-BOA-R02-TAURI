@@ -159,7 +159,10 @@ export async function* generateComposerStream(
   activeFileId?: string,
   projectTree?: string,
   mcpTools: any[] = [],
-  ollamaUrl: string = 'http://localhost:11434'
+  ollamaUrl: string = 'http://localhost:11434',
+  systemInstruction: string = '',
+  aiRules: string = '',
+  aiTemperature: number = 0.7
 ) {
   const filesContextStr = buildProjectContextPrompt(filesContext, activeFileId, projectTree);
   
@@ -185,7 +188,9 @@ ${mcpTools.map(t => `- ${t.clientName}/${t.name}: ${t.description} (Schema: ${JS
   const categorySkill = DOMAIN_EXPERTISE[effectiveCategory] || '';
 
   const completePrompt = `
-${COMPOSER_SYSTEM_PROMPT}
+${systemInstruction ? `### SYSTEM INSTRUCTION:\n${systemInstruction}\n` : COMPOSER_SYSTEM_PROMPT}
+
+${aiRules ? `### CRITICAL RULES:\n${aiRules}\n` : ''}
 
 ${categorySkill ? ` \n### APPLIED AUTO-DETECTED SKILL [${effectiveCategory}]:\n${categorySkill}\n` : ''}
 
@@ -206,6 +211,7 @@ ${userPrompt}
       contents: [{ role: "user", parts: [{ text: completePrompt }] }],
       config: {
         maxOutputTokens: 16384,
+        temperature: aiTemperature
       }
     });
 
@@ -238,7 +244,8 @@ ${userPrompt}
       body: JSON.stringify({
         model: targetModel,
         messages: [{ role: "user", content: completePrompt }],
-        stream: true
+        stream: true,
+        temperature: aiTemperature
       })
     });
 

@@ -47,7 +47,8 @@ export async function* generateGeminiStream(
   model: string, 
   prompt: string, 
   attachments: any[] = [],
-  chatHistory: { role: string; content: string }[] = []
+  chatHistory: { role: string; content: string }[] = [],
+  temperature: number = 0.7
 ) {
   const ai = getGeminiAI(apiKey);
   
@@ -75,6 +76,7 @@ export async function* generateGeminiStream(
     contents: [...formattedHistory, { role: "user", parts: contentParts }],
     config: {
       maxOutputTokens: 16384,
+      temperature: temperature
     }
   });
 

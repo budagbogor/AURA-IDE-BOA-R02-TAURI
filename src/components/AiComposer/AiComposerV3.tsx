@@ -38,13 +38,17 @@ interface AiComposerV3Props {
   mcpTools: any[];
   ollamaUrl: string;
   activeAgentId: string;
+  systemInstruction: string;
+  aiRules: string;
+  aiTemperature: number;
 }
 
 export const AiComposerV3: React.FC<AiComposerV3Props> = ({
   provider, apiKey, model, files, activeFileId, appendTerminalOutput,
   onSuccess, projectTree, messages, setMessages,
   autoFixTrigger, autoFixMessage, onExecuteCommand, onApplyCode,
-  nativeProjectPath, mcpTools, ollamaUrl, activeAgentId
+  nativeProjectPath, mcpTools, ollamaUrl, activeAgentId,
+  systemInstruction, aiRules, aiTemperature
 }) => {
   const [input, setInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -52,8 +56,8 @@ export const AiComposerV3: React.FC<AiComposerV3Props> = ({
 
   const { runAutonomousLoop, isLooping } = useAutonomousAI(
     provider, apiKey, model, files, category, activeFileId, 
-    projectTree, mcpTools, ollamaUrl, setMessages, 
-    appendTerminalOutput, onApplyCode, onSuccess
+    projectTree, mcpTools, ollamaUrl, systemInstruction, aiRules, aiTemperature,
+    setMessages, appendTerminalOutput, onApplyCode, onSuccess
   );
 
   useEffect(() => {

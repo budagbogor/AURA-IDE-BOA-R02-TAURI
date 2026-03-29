@@ -235,7 +235,8 @@ export default function App() {
     selectedSkill, setSelectedSkill,
     activeAgentId, setActiveAgentId,
     aiRules, setAiRules,
-    systemInstruction, setSystemInstruction
+    systemInstruction, setSystemInstruction,
+    aiTemperature, setAiTemperature
   } = useAiChat();
 
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
@@ -890,7 +891,7 @@ Integrations:
             setChatMessages(prev => [...prev, assistantMsg]);
             
             let fullResponse = '';
-            const stream = generateGeminiStream(apiKey, selectedModel, prompt, attachedFiles, chatMessages);
+            const stream = generateGeminiStream(apiKey, selectedModel, prompt, attachedFiles, chatMessages, aiTemperature);
             let lastUpdateTime = Date.now();
             
             for await (const chunk of stream) {
@@ -2094,6 +2095,8 @@ export default function App() {
         setSystemInstruction={setSystemInstruction}
         aiRules={aiRules}
         setAiRules={setAiRules}
+        aiTemperature={aiTemperature}
+        setAiTemperature={setAiTemperature}
         selectedSkill={selectedSkill}
         setSelectedSkill={setSelectedSkill}
         context7Mode={context7Mode}
@@ -2339,6 +2342,9 @@ export default function App() {
                 mcpTools={mcpServers.filter(s => s.connected).flatMap(s => s.tools || [])}
                 ollamaUrl={ollamaUrl}
                 activeAgentId={activeAgentId}
+                systemInstruction={systemInstruction}
+                aiRules={aiRules}
+                aiTemperature={aiTemperature}
               />
             )}
           </div>

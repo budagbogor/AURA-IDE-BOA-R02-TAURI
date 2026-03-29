@@ -12,6 +12,9 @@ export const useAutonomousAI = (
   projectTree: string,
   mcpTools: any[],
   ollamaUrl: string,
+  systemInstruction: string,
+  aiRules: string,
+  aiTemperature: number,
   setMessages: (updater: (prev: any[]) => any[]) => void,
   appendTerminalOutput: (msg: string) => void,
   onApplyCode: (path: string, content: string, action?: "create_or_modify" | "delete") => Promise<void>,
@@ -32,7 +35,7 @@ export const useAutonomousAI = (
         loopCount++;
         const stream = generateComposerStream(
           provider, apiKey, model, currentPrompt, files, category, 
-          activeFileId, projectTree, mcpTools, ollamaUrl
+          activeFileId, projectTree, mcpTools, ollamaUrl, systemInstruction, aiRules, aiTemperature
         );
 
         fullResponse = '';

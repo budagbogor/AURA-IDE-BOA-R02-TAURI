@@ -19,10 +19,19 @@ export const useAiChat = () => {
   const [activeAgentId, setActiveAgentId] = useState('pm');
   const [aiRules, setAiRules] = useState(() => localStorage.getItem('aura_ai_rules') || '');
   const [systemInstruction, setSystemInstruction] = useState(() => localStorage.getItem('aura_system_instruction') || 'You are Aura, the Lead Orchestrator of the AURA Collective. Coordinate between specialized agents and ensure high-quality, verified results.');
+  const [aiTemperature, setAiTemperature] = useState(() => parseFloat(localStorage.getItem('aura_ai_temperature') || '0.7'));
 
   useEffect(() => {
     localStorage.setItem('aura_ai_rules', aiRules);
   }, [aiRules]);
+
+  useEffect(() => {
+    localStorage.setItem('aura_system_instruction', systemInstruction);
+  }, [systemInstruction]);
+
+  useEffect(() => {
+    localStorage.setItem('aura_ai_temperature', aiTemperature.toString());
+  }, [aiTemperature]);
 
   useEffect(() => {
     localStorage.setItem('aura_system_instruction', systemInstruction);
@@ -37,6 +46,7 @@ export const useAiChat = () => {
     selectedSkill, setSelectedSkill,
     activeAgentId, setActiveAgentId,
     aiRules, setAiRules,
-    systemInstruction, setSystemInstruction
+    systemInstruction, setSystemInstruction,
+    aiTemperature, setAiTemperature
   };
 };
