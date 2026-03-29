@@ -1223,8 +1223,10 @@ Integrations:
     }
   };
 
-  const handleApplyCode = async (path: string, content: string, action?: 'create_or_modify' | 'delete') => {
+  const handleApplyCode = async (pathRaw: string, content: string, action?: 'create_or_modify' | 'delete') => {
     const isDelete = action === 'delete';
+    // Normalize path: hapus ./ di awal dan pastikan folder separator konsisten
+    const path = pathRaw.replace(/^\.\/|^\//, '').replace(/\\/g, '/');
     
     // 1. Update React State
     setFiles(currentFiles => {
@@ -1270,6 +1272,8 @@ Integrations:
           }
           await tauriFs.writeTextFile(fullPath, content);
         }
+        // Force Explorer sync to show new files immediately
+        await syncFilesFromNativePath(nativeProjectPath, true);
       } catch (err) {
         console.error('[AURA FS] Sync Error:', err);
       }

@@ -133,7 +133,13 @@ export const AiComposerV3: React.FC<AiComposerV3Props> = ({
                 ) : (
                   <Markdown>
                     {msg.content
-                      .replace(/```(file|delete):([^\n]+)\n([\s\S]*?)(?:```|$)/g, '\n> 📦 **$2** *(Kode telah diproses ke Editor Tengah)*\n')
+                      .replace(/```(file|delete|javascript|typescript|json|css|html):([^\n]+)\n([\s\S]*?)(?:```|$)/g, (match, type, path) => {
+                        // Jika ada path (ada titik atau slash), anggap ini upaya menulis file
+                        if (path.includes('.') || path.includes('/') || type === 'file' || type === 'delete') {
+                           return `\n> 📦 **${path}** *(Kode telah dikirim ke Editor Tengah)*\n`;
+                        }
+                        return match;
+                      })
                       .replace(/```call:mcp\/([^\/]+)\/([^\n]+)\n([\s\S]*?)(?:```|$)/g, '\n> 🛠️ **Otonom Tool: $2** \n')}
                   </Markdown>
                 )}

@@ -29,15 +29,15 @@ ${ELITE_DESIGN_PROMPT}
    - Di akhir jawaban, sertakan satu baris instalasi \`\`\`command:npm install react react-dom && npm install -D vite @vitejs/plugin-react tailwindcss @tailwindcss/vite lucide-react framer-motion && npm run dev\`\`\` agar dependensi teraplikasikan dan localhost mengudara!
 
 FILE MODIFICATION RULES (SANGAT KETAT & HARGA MATI):
-1. Anda WAJIB MENGGUNAKAN TRIPLE BACKTICKS (\`\`\`) dengan awalan "file:path/nama-file.ext" untuk setiap file yang Anda buat atau ubah.
+1. Anda WAJIB MENGGUNAKAN TRIPLE BACKTICKS (\`\`\`) dengan awalan "file:path/nama-file.ext" untuk setiap file yang Anda buat atau ubah. DILARANG KERAS menggunakan backticks standar (misal: \`\`\`json) untuk file proyek. SELALU gunakan "file:".
    FORMAT WAJIB:
    \`\`\`file:path/to/file.ext
    [TULIS SELURUH KONTEN FILE SECARA 100% LENGKAP DISINI]
    \`\`\`
-2. DILARANG KERAS merespons kode hanya dengan teks biasa atau di luar format backticks. Jika Anda mengabaikan aturan ini, kode akan nyangkut di "Panel Kanan" (Chat) dan gagal dimuat ke "Panel Tengah" (Editor) apalagi ke "Panel Kiri" (Folder)!
+2. DILARANG KERAS merespons kode hanya dengan teks biasa atau di luar format backticks "file:". Jika Anda mengabaikan aturan ini, kode akan nyangkut di "Panel Kanan" (Chat) dan user akan kecewa karena kode tidak masuk ke Editor!
 3. KONTEN FILE HARUS 100% LENGKAP & UTUH. JANGAN PERNAH memotong sebagian kode atau menggunakan komentar placeholder seperti "// ... kode lainnya tetap sama".
 4. DILARANG KERAS menggabungkan beberapa file ke dalam satu blok backticks. Setiap file wajib memiliki blok "file:..." tersendiri.
-5. FOKUS UTAMA: Panel Kanan (Chat) HANYA untuk "plan chat" dan persetujuan. SELURUH kode yang dihasilkan HARUS ada di dalam blok \`\`\`file:... \`\`\` agar IDE otomatis merendernya ke Multiple Tabs di Panel Tengah.
+5. FOKUS UTAMA: Panel Kanan (Chat) HANYA untuk "plan chat". SELURUH kode yang dihasilkan HARUS ada di dalam blok \`\`\`file:... \`\`\` agar IDE otomatis mengirimnya ke Sidebar Explorer dan Editor Tengah.
 
 STRICT RULES:
 - Gunakan React 19 & Tailwind CSS v4.
@@ -323,7 +323,8 @@ export function parseComposerResponse(fullResponse: string) {
   const files: { path: string; action: 'create_or_modify' | 'delete'; content: string }[] = [];
   
   // Regex membolehkan blok tidak ditutup jika text terputus mendadak ($)
-  const blockRegex = /\`\`\`(file|delete):([^\n]+)\n([\s\S]*?)(?:\`\`\`|$)/g;
+  // Mendukung fallback language identifiers jika AI lupa format murni 'file:'
+  const blockRegex = /\`\`\`(file|delete|javascript|typescript|json|css|html):([^\n]+)\n([\s\S]*?)(?:\`\`\`|$)/g;
   
   let match;
   while ((match = blockRegex.exec(fullResponse)) !== null) {
