@@ -39,13 +39,18 @@ export const useAutonomousAI = (
         // Start streaming to the UI
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
-        for await (const chunk of stream) {
-          fullResponse += chunk;
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            newMsgs[newMsgs.length - 1] = { role: 'assistant', content: fullResponse };
-            return newMsgs;
-          });
+        try {
+          for await (const chunk of stream) {
+            fullResponse += chunk;
+            setMessages(prev => {
+              const newMsgs = [...prev];
+              newMsgs[newMsgs.length - 1] = { role: 'assistant', content: fullResponse };
+              return newMsgs;
+            });
+          }
+        } catch (streamErr: any) {
+          console.warn("Stream interrupted or error:", streamErr);
+          setMessages(prev => [...prev, { role: 'assistant', content: `\n\n⚠️ **[AURA: Stream Terhenti]** ${streamErr.message}` }]);
         }
 
         // --- STEP 2: PARSE FOR TOOL CALLS ---

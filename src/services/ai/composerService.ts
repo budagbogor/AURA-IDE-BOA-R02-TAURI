@@ -197,6 +197,9 @@ ${userPrompt}
     const result = await ai.models.generateContentStream({
       model: model || "gemini-2.0-flash",
       contents: [{ role: "user", parts: [{ text: completePrompt }] }],
+      config: {
+        maxOutputTokens: 16384,
+      }
     });
 
     for await (const chunk of result) {
@@ -241,11 +244,15 @@ ${userPrompt}
     const decoder = new TextDecoder();
     if (!reader) throw new Error("Failed to get response reader");
 
+    let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      
+      // Keep the last line in the buffer, as it might be incomplete
+      buffer = lines.pop() || '';
       
       for (const line of lines) {
         if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
@@ -255,7 +262,7 @@ ${userPrompt}
               yield data.choices[0].delta.content;
             }
           } catch (e) {
-            // ignore JSON parse error on partial stream
+            // ignore JSON parse error on partial data
           }
         }
       }
@@ -277,11 +284,16 @@ ${userPrompt}
     const decoder = new TextDecoder();
     if (!reader) throw new Error("Failed to get reader");
 
+    let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const jsonStr = decoder.decode(value);
-      const lines = jsonStr.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      
+      // Keep last line in buffer
+      buffer = lines.pop() || '';
+      
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
@@ -295,7 +307,9 @@ ${userPrompt}
 
 export function parseComposerResponse(fullResponse: string) {
   const files: { path: string; action: 'create_or_modify' | 'delete'; content: string }[] = [];
-  const blockRegex = /\`\`\`(file|delete):([^\n]+)\n([\s\S]*?)\`\`\`/g;
+  
+  // Regex membolehkan blok tidak ditutup jika text terputus mendadak ($)
+  const blockRegex = /\`\`\`(file|delete):([^\n]+)\n([\s\S]*?)(?:\`\`\`|$)/g;
   
   let match;
   while ((match = blockRegex.exec(fullResponse)) !== null) {
