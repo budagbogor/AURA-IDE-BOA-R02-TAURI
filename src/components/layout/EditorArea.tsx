@@ -5,17 +5,10 @@ import { motion } from 'motion/react';
 import { cn } from '@/utils/cn';
 import { getFileIcon } from '@/utils/icons';
 import { AuraLogo } from '@/components/layout/AuraLogo';
-import { FileItem } from '@/types';
+import { FileItem, StagingFile } from '@/types';
 import { WorkflowDiagram } from '@/components/features/WorkflowDiagram';
 import { StagingArea } from '@/components/layout/StagingArea';
 import { fetchPredictiveCompletion } from '@/services/ai/predictiveAutocomplete';
-interface StagingFile {
-  path: string;
-  originalContent: string;
-  newContent: string;
-  action: 'create_or_modify' | 'delete';
-  status: 'pending' | 'accepted' | 'rejected';
-}
 
 interface EditorAreaProps {
   files: FileItem[];
@@ -165,9 +158,6 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               <span className="text-[10px] font-medium whitespace-nowrap">Clone URL</span>
             </button>
           </div>
-          {/* Shortcuts removed (available in status bar) */}
-
-
           {/* Workflow Diagram Section */}
           <WorkflowDiagram />
         </div>

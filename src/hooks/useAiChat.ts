@@ -1,52 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 export const useAiChat = () => {
-  const chatMessages = useAppStore(state => state.chatMessages);
-  const setChatMessages = useAppStore(state => state.setChatMessages);
-  const [composerMessages, setComposerMessages] = useState<any[]>([
-    { role: 'assistant', content: 'Assalamualaikum...' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; data: string; content?: string }[]>([]);
-  const [selectedSkill, setSelectedSkill] = useState('Aura Orchestrator');
-  const [activeAgentId, setActiveAgentId] = useState('pm');
-  const [aiRules, setAiRules] = useState(() => localStorage.getItem('aura_ai_rules') || '');
-  const [systemInstruction, setSystemInstruction] = useState(() => localStorage.getItem('aura_system_instruction') || 'You are Aura, the Lead Orchestrator of the AURA Collective. Coordinate between specialized agents and ensure high-quality, verified results.');
-  const [aiTemperature, setAiTemperature] = useState(() => parseFloat(localStorage.getItem('aura_ai_temperature') || '0.7'));
+  const store = useAppStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    localStorage.setItem('aura_ai_rules', aiRules);
-  }, [aiRules]);
+  const handleSendMessage = async () => {
+    if (!store.chatInput.trim()) return;
+    
+    // Logic for sending message to AI service
+    const userMsg = { role: 'user', content: store.chatInput } as const;
+    store.setChatMessages(prev => [...prev, userMsg]);
+    store.setChatInput('');
+    
+    // Auto scroll
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  };
 
-  useEffect(() => {
-    localStorage.setItem('aura_system_instruction', systemInstruction);
-  }, [systemInstruction]);
+  const removeAttachment = (index: number) => {
+    store.setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
-  useEffect(() => {
-    localStorage.setItem('aura_ai_temperature', aiTemperature.toString());
-  }, [aiTemperature]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_system_instruction', systemInstruction);
-  }, [systemInstruction]);
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      // Basic file reading logic
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          store.setAttachedFiles(prev => [...prev, {
+            name: file.name,
+            type: file.type,
+            data: ev.target?.result as string,
+            content: ev.target?.result as string
+          }]);
+        };
+        reader.readAsText(file);
+      });
+    }
+  };
 
   return {
-    chatMessages, setChatMessages,
-    composerMessages, setComposerMessages,
-    chatInput, setChatInput,
-    isAiLoading, setIsAiLoading,
-    attachedFiles, setAttachedFiles,
-    selectedSkill, setSelectedSkill,
-    activeAgentId, setActiveAgentId,
-    aiRules, setAiRules,
-    systemInstruction, setSystemInstruction,
-    aiTemperature, setAiTemperature
+    ...store,
+    fileInputRef,
+    chatEndRef,
+    handleSendMessage,
+    removeAttachment,
+    handleFileUpload
   };
 };

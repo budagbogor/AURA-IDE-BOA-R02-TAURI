@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { Terminal, Plus, X, AlertCircle, AlertTriangle, Info, CheckCircle, RefreshCw, Play, Monitor } from 'lucide-react';
+import { Terminal, Plus, X, AlertCircle, AlertTriangle, Info, CheckCircle, RefreshCw, Play } from 'lucide-react';
 import { TerminalAdapter } from './TerminalAdapter';
 import { cn } from '@/utils/cn';
-import { FileItem } from '@/types';
+import { FileItem, TerminalSession, CodeProblem } from '@/types';
 
 interface BottomPanelProps {
   zenMode: boolean;
@@ -10,8 +10,8 @@ interface BottomPanelProps {
   setIsResizingBottom: (v: boolean) => void;
   bottomTab: 'terminal' | 'problems' | 'output' | 'debug';
   setBottomTab: (tab: 'terminal' | 'problems' | 'output' | 'debug') => void;
-  terminalSessions: any[];
-  setTerminalSessions: React.Dispatch<React.SetStateAction<any[]>>;
+  terminalSessions: TerminalSession[];
+  setTerminalSessions: (updater: TerminalSession[] | ((prev: TerminalSession[]) => TerminalSession[])) => void;
   activeTerminalId: string;
   setActiveTerminalId: (id: string) => void;
   addTerminalSession: () => void;
@@ -19,7 +19,7 @@ interface BottomPanelProps {
   terminalInput: string;
   setTerminalInput: (input: string) => void;
   handleTerminalCommand: (e: React.KeyboardEvent) => void;
-  problems: any[];
+  problems: CodeProblem[];
   activeFile: FileItem | null;
   isScanning: boolean;
   scanForProblems: () => void;
@@ -28,6 +28,9 @@ interface BottomPanelProps {
   historyIndex: number;
   setHistoryIndex: (index: number) => void;
   onKillProcess: () => void;
+  onClearTerminal: () => void;
+  terminalSuggestions: Array<{ command: string; description: string }>;
+  terminalPresets: Array<{ label: string; command: string; description: string }>;
 }
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({
@@ -53,9 +56,11 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   commandHistory,
   historyIndex,
   setHistoryIndex,
-  onKillProcess
+  onKillProcess,
+  onClearTerminal,
+  terminalSuggestions,
+  terminalPresets
 }) => {
-  const terminalEndRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -68,7 +73,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
     scrollToBottom();
   }, [terminalSessions, activeTerminalId, currentSession?.output]);
 
-  const displayPath = nativeProjectPath || '~/aura-project';
+  const displayPath = currentSession?.cwd || nativeProjectPath || '~/aura-project';
 
   if (zenMode) return null;
 
@@ -77,114 +82,141 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
       case 'terminal':
         return (
           <div className="flex-1 flex flex-col font-mono text-[13px] h-full overflow-hidden bg-[#0a0a0a]">
-            {/* Terminal Tabs Workspace */}
             <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-1.5 overflow-x-auto scrollbar-hide">
               {terminalSessions.map(s => (
-                <div 
-                   key={s.id}
-                   onClick={() => setActiveTerminalId(s.id)}
-                   className={cn(
-                     "group flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer transition-all duration-200 text-[11px] font-medium border border-transparent shrink-0",
-                     activeTerminalId === s.id 
-                       ? "bg-blue-600/20 text-blue-400 border-blue-500/30 pro-max-glow ring-1 ring-blue-500/10" 
-                       : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                   )}
+                <div
+                  key={s.id}
+                  onClick={() => setActiveTerminalId(s.id)}
+                  className={cn(
+                    'group flex items-center gap-2 px-4 py-1.5 rounded-lg cursor-pointer transition-all duration-200 text-[11px] font-medium border border-transparent shrink-0',
+                    activeTerminalId === s.id
+                      ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 pro-max-glow ring-1 ring-blue-500/10'
+                      : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                  )}
                 >
                   {s.isRunning && s.currentCommand?.includes('npm i') ? (
-                    <RefreshCw size={12} className={cn("animate-spin", activeTerminalId === s.id ? "text-emerald-400" : "text-emerald-600")} />
+                    <RefreshCw size={12} className={cn('animate-spin', activeTerminalId === s.id ? 'text-emerald-400' : 'text-emerald-600')} />
                   ) : (
-                    <Terminal size={12} className={activeTerminalId === s.id ? "text-blue-400" : "text-gray-600"} />
+                    <Terminal size={12} className={activeTerminalId === s.id ? 'text-blue-400' : 'text-gray-600'} />
                   )}
                   <span>{s.name}</span>
                   {terminalSessions.length > 1 && (
-                    <X 
-                       size={10} 
-                       className="opacity-0 group-hover:opacity-100 hover:text-white transition-opacity ml-1" 
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         closeTerminalSession(s.id);
-                       }}
+                    <X
+                      size={10}
+                      className="opacity-0 group-hover:opacity-100 hover:text-white transition-opacity ml-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void closeTerminalSession(s.id);
+                      }}
                     />
                   )}
                 </div>
               ))}
-              <button 
-                 onClick={addTerminalSession}
-                 className="p-1.5 hover:bg-white/5 rounded-md text-gray-500 hover:text-white transition-all ml-1"
-                 title="New Terminal"
+              <button
+                onClick={addTerminalSession}
+                className="p-1.5 hover:bg-white/5 rounded-md text-gray-500 hover:text-white transition-all ml-1"
+                title="New Terminal"
               >
                 <Plus size={14} />
               </button>
-              
+
               <div className="h-4 w-[1px] bg-white/10 mx-1"></div>
-              
-              <button 
-                 onClick={onKillProcess}
-                 className="p-1.5 hover:bg-red-500/20 rounded-md text-red-500/60 hover:text-red-400 transition-all ml-1 flex items-center gap-1.5"
-                 title="Kill Active Process (Ctrl+C)"
+
+              <button
+                onClick={onKillProcess}
+                className="p-1.5 hover:bg-red-500/20 rounded-md text-red-500/60 hover:text-red-400 transition-all ml-1 flex items-center gap-1.5"
+                title="Kill Active Process (Ctrl+C)"
               >
                 <X size={14} />
                 <span className="text-[9px] font-bold">KILL</span>
               </button>
             </div>
 
-            {/* Terminal Output - v2.4.0 Professional XTerm */}
             <div className="flex-1 overflow-hidden relative border-t border-white/5 bg-[#0a0a0a]">
-              <TerminalAdapter 
+              <TerminalAdapter
                 id={currentSession?.id}
                 output={currentSession?.output || []}
                 isRunning={currentSession?.isRunning}
-                height={bottomHeight - 80}
               />
-              
+
               <div className="absolute top-2 right-4 text-blue-400/30 font-black text-[9px] tracking-widest uppercase pointer-events-none z-10">
                 AURA ENGINE v6.0
               </div>
             </div>
 
-            {/* Terminal Input Area */}
-            <div className="flex items-center text-white border-t border-white/5 px-2 py-1.5 bg-black/20 font-mono">
-              <div className="flex items-center shrink-0">
-                <span className="text-emerald-500 mr-1">➜</span>
-                <span className="text-blue-400 font-bold text-[12px] truncate max-w-[300px]" title={displayPath}>{displayPath}</span>
-                <span className="text-gray-600 ml-1">$</span>
+            <div className="border-t border-white/5 bg-black/20">
+              <div className="flex flex-wrap items-center gap-2 px-2 pt-2">
+                {terminalPresets.slice(0, 8).map((preset) => (
+                  <button
+                    key={`${preset.label}-${preset.command}`}
+                    onClick={() => setTerminalInput(preset.command)}
+                    className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-gray-300 transition-colors hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-white"
+                    title={preset.description}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
               </div>
-              <input 
-                 type="text" 
-                 value={terminalInput}
-                 onChange={(e) => {
-                   setTerminalInput(e.target.value);
-                 }}
-                 onKeyDown={(e) => {
-                   if (e.key === 'ArrowUp') {
-                     e.preventDefault();
-                     if (commandHistory.length > 0 && historyIndex < commandHistory.length - 1) {
-                       const newIndex = historyIndex + 1;
-                       setHistoryIndex(newIndex);
-                       setTerminalInput(commandHistory[newIndex]);
-                     }
-                   } else if (e.key === 'ArrowDown') {
-                     e.preventDefault();
-                     if (historyIndex > 0) {
-                       const newIndex = historyIndex - 1;
-                       setHistoryIndex(newIndex);
-                       setTerminalInput(commandHistory[newIndex]);
-                     } else if (historyIndex === 0) {
-                       setHistoryIndex(-1);
-                       setTerminalInput('');
-                     }
-                   } else if (e.key === 'c' && e.ctrlKey) {
-                     // Ctrl+C to kill running process
-                     e.preventDefault();
-                     setTerminalInput('');
-                   } else {
-                     handleTerminalCommand(e);
-                   }
-                 }}
-                 className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder:text-gray-700/50 ml-2 caret-white"
-                 placeholder="ketik perintah..."
-                 autoFocus
-              />
+
+              {terminalSuggestions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 px-2 pt-2 text-[10px] text-gray-400">
+                  {terminalSuggestions.slice(0, 3).map((suggestion, index) => (
+                    <button
+                      key={`${suggestion.command}-${index}`}
+                      onClick={() => setTerminalInput(suggestion.command)}
+                      className="flex items-center gap-1 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-left transition-colors hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-white"
+                      title={suggestion.description}
+                    >
+                      <span className="text-blue-400">{index === 0 ? 'Tab' : 'Tip'}</span>
+                      <span>{suggestion.command}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center text-white px-2 py-1.5 font-mono">
+                <div className="flex items-center shrink-0">
+                  <span className="text-emerald-500 mr-1">&gt;</span>
+                  <span className="text-blue-400 font-bold text-[12px] truncate max-w-[300px]" title={displayPath}>{displayPath}</span>
+                  <span className="text-gray-600 ml-1">$</span>
+                </div>
+                <input
+                  type="text"
+                  value={terminalInput}
+                  onChange={(e) => {
+                    setTerminalInput(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      if (commandHistory.length > 0 && historyIndex < commandHistory.length - 1) {
+                        const newIndex = historyIndex + 1;
+                        setHistoryIndex(newIndex);
+                        setTerminalInput(commandHistory[newIndex]);
+                      }
+                    } else if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      if (historyIndex > 0) {
+                        const newIndex = historyIndex - 1;
+                        setHistoryIndex(newIndex);
+                        setTerminalInput(commandHistory[newIndex]);
+                      } else if (historyIndex === 0) {
+                        setHistoryIndex(-1);
+                        setTerminalInput('');
+                      }
+                    } else if (e.key === 'c' && e.ctrlKey) {
+                      e.preventDefault();
+                      onKillProcess();
+                      setTerminalInput('');
+                    } else {
+                      handleTerminalCommand(e);
+                    }
+                  }}
+                  className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder:text-gray-700/50 ml-2 caret-white"
+                  placeholder="ketik perintah..."
+                  autoFocus
+                />
+              </div>
             </div>
           </div>
         );
@@ -219,21 +251,21 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
       case 'output':
         return (
           <div className="flex-1 font-mono text-[12px] p-4 text-gray-400 overflow-y-auto h-full">
-            [info] [2026-03-19 11:38:33] Starting Aura Language Server...
+            [info] [2026-03-29 11:38:33] Starting Aura Language Server...
             <br />
-            [info] [2026-03-19 11:38:34] Indexing workspace: aura-project
+            [info] [2026-03-29 11:38:34] Indexing workspace: aura-project
             <br />
-            [info] [2026-03-19 11:38:35] Language server ready.
+            [info] [2026-03-29 11:38:35] Language server ready.
             <br />
-            [info] [2026-03-19 11:38:40] File changed: src/App.tsx
+            [info] [2026-03-29 11:38:40] File changed: src/App.tsx
             <br />
-            [info] [2026-03-19 11:38:41] Re-indexing...
+            [info] [2026-03-29 11:38:41] Re-indexing...
           </div>
         );
       case 'debug':
         return (
           <div className="flex-1 flex flex-col items-center justify-center text-[#858585] gap-3 h-full min-h-[150px]">
-            <Terminal size={40} className="opacity-10" />
+            <Play size={40} className="opacity-10 text-blue-500" />
             <div className="text-center">
               <p className="text-[14px]">Debug Console is empty</p>
               <p className="text-[12px] opacity-60">Start debugging to see output here.</p>
@@ -248,15 +280,12 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
     }
   };
 
-  if (zenMode) return null;
-
   return (
-    <div 
+    <div
       style={{ height: bottomHeight }}
       className="bg-[#1e1e1e] border-t border-white/10 flex flex-col relative shrink-0"
     >
-      {/* Resizer Handle (Horizontal) - Premium Drag Area */}
-      <div 
+      <div
         onMouseDown={(e) => {
           e.preventDefault();
           setIsResizingBottom(true);
@@ -264,54 +293,54 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
           document.body.style.userSelect = 'none';
         }}
         className={cn(
-          "absolute -top-3 left-0 right-0 h-6 cursor-row-resize z-[100] group/resizer flex justify-center",
-          "hover:bg-blue-500/20 transition-all duration-300"
+          'absolute -top-3 left-0 right-0 h-6 cursor-row-resize z-[100] group/resizer flex justify-center',
+          'hover:bg-blue-500/20 transition-all duration-300'
         )}
       >
-         <div className="mt-1 w-20 h-1.5 bg-white/20 group-hover/resizer:bg-blue-400/80 rounded-full transition-colors drop-shadow-lg shadow-black/50" />
+        <div className="mt-1 w-20 h-1.5 bg-white/20 group-hover/resizer:bg-blue-400/80 rounded-full transition-colors drop-shadow-lg shadow-black/50" />
       </div>
-      
+
       <div className="flex items-center gap-4 px-4 py-1 text-[11px] uppercase font-bold text-[#858585] border-b border-white/5 shrink-0">
-        <span 
+        <span
           onClick={() => setBottomTab('terminal')}
-          className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'terminal' ? "text-white border-b border-white" : "hover:text-white")}
+          className={cn('cursor-pointer py-1 transition-colors', bottomTab === 'terminal' ? 'text-white border-b border-white' : 'hover:text-white')}
         >
           Terminal
         </span>
-        <span 
+        <span
           onClick={() => setBottomTab('problems')}
-          className={cn("cursor-pointer py-1 transition-colors flex items-center gap-1", bottomTab === 'problems' ? "text-white border-b border-white" : "hover:text-white")}
+          className={cn('cursor-pointer py-1 transition-colors flex items-center gap-1', bottomTab === 'problems' ? 'text-white border-b border-white' : 'hover:text-white')}
         >
           Problems {problems.length > 0 && <span className="bg-red-500 text-white rounded-full px-1 text-[9px]">{problems.length}</span>}
         </span>
-        <span 
+        <span
           onClick={() => setBottomTab('output')}
-          className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'output' ? "text-white border-b border-white" : "hover:text-white")}
+          className={cn('cursor-pointer py-1 transition-colors', bottomTab === 'output' ? 'text-white border-b border-white' : 'hover:text-white')}
         >
           Output
         </span>
-        <span 
+        <span
           onClick={() => setBottomTab('debug')}
-          className={cn("cursor-pointer py-1 transition-colors", bottomTab === 'debug' ? "text-white border-b border-white" : "hover:text-white")}
+          className={cn('cursor-pointer py-1 transition-colors', bottomTab === 'debug' ? 'text-white border-b border-white' : 'hover:text-white')}
         >
           Debug Console
         </span>
-        
+
         <div className="ml-auto flex items-center gap-3">
-          <button 
+          <button
             onClick={scanForProblems}
             disabled={isScanning}
             className="flex items-center gap-1 text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
             title="Scan current file for problems"
           >
-            <RefreshCw size={12} className={cn(isScanning && "animate-spin")} />
+            <RefreshCw size={12} className={cn(isScanning && 'animate-spin')} />
             <span className="text-[10px]">Scan Code</span>
           </button>
           <Play size={12} className="text-green-500 cursor-pointer" />
-          <X size={12} className="cursor-pointer" />
+          <X size={12} className="cursor-pointer" onClick={onClearTerminal} />
         </div>
       </div>
-      
+
       <div className="flex-1 overflow-hidden min-h-0 bg-black/20">
         {renderContent()}
       </div>

@@ -1,16 +1,16 @@
 {
   "name": "aura-ide",
   "private": true,
-  "version": "15.3.7",
+  "version": "15.3.115",
   "description": "Aura AI IDE - Professional Hybrid Development Environment",
   "author": "B.O.A. Indonesia",
-  "main": "src-electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "dev:tauri": "tauri dev",
+    "dev:tauri": "powershell -ExecutionPolicy Bypass -File .\\scripts\\prepare-tauri-dev.ps1 && tauri dev",
     "build": "vite build",
     "build:tauri": "tauri build",
+    "build:tauri:versioned": "powershell -ExecutionPolicy Bypass -File .\\scripts\\build-versioned-tauri.ps1",
     "tauri": "tauri",
     "build:web": "vite build",
     "preview": "vite preview",
@@ -47,7 +47,7 @@
     "vite": "^6.2.0",
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@tauri-apps/api": "^2.10.1",
