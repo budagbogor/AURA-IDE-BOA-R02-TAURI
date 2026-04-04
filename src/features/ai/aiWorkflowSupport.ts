@@ -133,6 +133,7 @@ export const buildTailwindUiContract = () => [
 
 export const buildAiPromptEnvelope = ({
   developerContext,
+  projectRulesContext,
   domains,
   preferredTargets,
   executionPlan,
@@ -140,6 +141,7 @@ export const buildAiPromptEnvelope = ({
   prompt
 }: {
   developerContext: string;
+  projectRulesContext?: string;
   domains: string[];
   preferredTargets: string[];
   executionPlan: string[];
@@ -154,6 +156,7 @@ export const buildAiPromptEnvelope = ({
 
   return [
     developerContext,
+    projectRulesContext || '',
     domainContext,
     targetContext,
     planContext,
@@ -317,6 +320,7 @@ export const buildUiReviewLoopPrompt = ({
   userPrompt,
   domains,
   preferredTargets,
+  projectRulesContext = '',
   checklist,
   generatedFiles,
   reviewMode = 'source',
@@ -325,6 +329,7 @@ export const buildUiReviewLoopPrompt = ({
   userPrompt: string;
   domains: string[];
   preferredTargets: string[];
+  projectRulesContext?: string;
   checklist: string[];
   generatedFiles: Array<{ relativePath: string; content: string }>;
   reviewMode?: 'source' | 'preview';
@@ -351,6 +356,8 @@ export const buildUiReviewLoopPrompt = ({
     `Active domains: ${domains.join(', ')}`,
     `Preferred targets:\n${preferredTargets.map((item) => `- ${item}`).join('\n') || '- workspace root'}`,
     '',
+    projectRulesContext,
+    '',
     buildProfessionalUiContract(),
     buildUiStyleDecisionContract(),
     buildUiCriticalQualityGate(),
@@ -372,11 +379,13 @@ export const buildUiReviewLoopPrompt = ({
 export const buildStarterReplacementPrompt = ({
   userPrompt,
   preferredTargets,
+  projectRulesContext = '',
   generatedFiles,
   previewSnapshotContext
 }: {
   userPrompt: string;
   preferredTargets: string[];
+  projectRulesContext?: string;
   generatedFiles: Array<{ relativePath: string; content: string }>;
   previewSnapshotContext: string;
 }) => {
@@ -397,6 +406,8 @@ export const buildStarterReplacementPrompt = ({
     `Original user request:\n${userPrompt}`,
     '',
     `Preferred targets:\n${preferredTargets.map((item) => `- ${item}`).join('\n') || '- workspace root'}`,
+    '',
+    projectRulesContext,
     '',
     'Preview evidence:',
     previewSnapshotContext,

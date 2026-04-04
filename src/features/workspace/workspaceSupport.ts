@@ -632,6 +632,44 @@ export const inferSuggestedVerificationCommands = (
   return commands.slice(0, 4);
 };
 
+export const rewriteCommandForPrimaryWorkspaceApp = (
+  command: string,
+  files: FileItem[],
+  rootPath?: string | null
+) => {
+  const trimmed = command.trim();
+  if (!trimmed) return trimmed;
+
+  const normalized = trimmed.toLowerCase();
+  const packageTarget = getPrimaryWorkspacePackageTarget(files, rootPath);
+  if (!packageTarget?.packageRoot) return trimmed;
+
+  const packageRoot = packageTarget.packageRoot;
+  const manifest = packageTarget.manifest || {};
+  const scripts = manifest.scripts || {};
+  const packageManager = detectWorkspacePackageManagerAt(files, rootPath, packageRoot);
+
+  const alreadyScoped = /\s(--prefix|--cwd|--dir)\s/i.test(trimmed);
+  if (alreadyScoped) return trimmed;
+
+  const isInstall = /^(npm|pnpm|yarn|bun)\s+(install|i)\b/i.test(trimmed);
+  const isDev = /^(npm\s+run\s+dev|pnpm\s+dev|yarn\s+dev|bun\s+run\s+dev)\b/i.test(trimmed);
+  const isBuild = /^(npm\s+run\s+build|pnpm\s+build|yarn\s+build|bun\s+run\s+build)\b/i.test(trimmed);
+  const isLint = /^(npm\s+run\s+lint|pnpm\s+lint|yarn\s+lint|bun\s+run\s+lint)\b/i.test(trimmed);
+
+  if (isInstall) return packageManager.installCommand;
+  if (isDev && scripts.dev) return packageManager.devCommand;
+  if (isBuild && scripts.build) return packageManager.buildCommand;
+  if (isLint && scripts.lint) {
+    if (packageManager.label === 'pnpm') return `pnpm --dir ${packageRoot} lint`;
+    if (packageManager.label === 'yarn') return `yarn --cwd ${packageRoot} lint`;
+    if (packageManager.label === 'bun') return `bun --cwd ${packageRoot} run lint`;
+    return `npm --prefix ${packageRoot} run lint`;
+  }
+
+  return trimmed;
+};
+
 export const resolveAiCandidatePath = (
   candidatePath: string,
   preferredTargets: string[],

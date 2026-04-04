@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { terminalEngine } from '../core/terminal-engine';
 import type { CodeProblem } from '../types';
+import { rewriteCommandForPrimaryWorkspaceApp } from '@/features/workspace/workspaceSupport';
 
 type TerminalSuggestion = {
   command: string;
@@ -295,13 +296,17 @@ export const useTerminal = (
   const executeTerminalCommand = (rawCommand: string) => {
     const cmd = rawCommand.trim();
     if (!cmd) return;
+    const effectiveCommand = rewriteCommandForPrimaryWorkspaceApp(cmd, store.files, store.nativeProjectPath);
 
-    onCommandStart?.(cmd);
-    terminalEngine.execute(cmd, store.activeTerminalId, appendTerminalOutput, (url) => {
+    onCommandStart?.(effectiveCommand);
+    if (effectiveCommand !== cmd) {
+      appendTerminalOutput(`[AURA] Redirecting command to primary app: ${effectiveCommand}`);
+    }
+    terminalEngine.execute(effectiveCommand, store.activeTerminalId, appendTerminalOutput, (url) => {
       onDevServerDetected?.(url);
     });
     updateSessionHistory(store.activeTerminalId, (session) => ({
-      commandHistory: [cmd, ...(session?.commandHistory || []).filter((item) => item !== cmd)].slice(0, 100),
+      commandHistory: [effectiveCommand, ...(session?.commandHistory || []).filter((item) => item !== effectiveCommand)].slice(0, 100),
       historyIndex: -1
     }));
     setTerminalInput('');

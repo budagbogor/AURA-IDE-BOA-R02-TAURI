@@ -29,6 +29,7 @@ import {
   shouldRunUiReviewLoop
 } from '@/features/ai/aiWorkflowSupport';
 import { generateAiProviderResponse, prepareAiDraftBundle, type PreparedAiDraftBundle } from '@/features/ai/aiOrchestrator';
+import { buildProjectRulesContext } from '@/services/ai/projectRulesService';
 import {
   buildUserPromptMessage,
   createDraftReadyActivityUpdate,
@@ -562,6 +563,13 @@ export default function AppFull() {
       userPrompt,
       domains,
       preferredTargets,
+      projectRulesContext: buildProjectRulesContext({
+        files: useAppStore.getState().files,
+        rootPath: store.nativeProjectPath,
+        activeFilePath: activeFile?.path || activeFile?.id || null,
+        prompt: userPrompt,
+        domains
+      }),
       checklist: [
         ...(activeTaskPreset.executionChecklist || []),
         ...((activeCollectiveSkill?.checklist || []).slice(0, 6))
@@ -693,6 +701,13 @@ export default function AppFull() {
         const recoveryPrompt = buildStarterReplacementPrompt({
           userPrompt: context.userPrompt,
           preferredTargets: context.preferredTargets,
+          projectRulesContext: buildProjectRulesContext({
+            files: useAppStore.getState().files,
+            rootPath: store.nativeProjectPath,
+            activeFilePath: activeFile?.path || activeFile?.id || null,
+            prompt: context.userPrompt,
+            domains: context.domains
+          }),
           generatedFiles: collectPreviewReviewFiles(context.preferredTargets),
           previewSnapshotContext: snapshot.promptContext
         });
@@ -757,6 +772,13 @@ export default function AppFull() {
         userPrompt: context.userPrompt,
         domains: context.domains,
         preferredTargets: context.preferredTargets,
+        projectRulesContext: buildProjectRulesContext({
+          files: useAppStore.getState().files,
+          rootPath: store.nativeProjectPath,
+          activeFilePath: activeFile?.path || activeFile?.id || null,
+          prompt: context.userPrompt,
+          domains: context.domains
+        }),
         checklist: [
           ...(activeTaskPreset.executionChecklist || []),
           ...((activeCollectiveSkill?.checklist || []).slice(0, 6))
@@ -1713,6 +1735,13 @@ export default function AppFull() {
     const workDomains = detectWorkDomains(prompt, activeFile, store.files);
     const preferredTargets = inferPreferredWorkspaceTargets(workDomains, store.files, store.nativeProjectPath, activeFile);
     const executionPlan = inferExecutionPlan(workDomains, preferredTargets, prompt);
+    const projectRulesContext = buildProjectRulesContext({
+      files: store.files,
+      rootPath: store.nativeProjectPath,
+      activeFilePath: activeFile?.path || activeFile?.id || null,
+      prompt,
+      domains: workDomains
+    });
     const isLikelyCodingRequest = isLikelyCodingPrompt(prompt);
     let activityId: string | null = null;
 
@@ -1751,6 +1780,7 @@ export default function AppFull() {
       const attachmentContext = buildAttachmentPromptContext(attachments);
       const promptWithPreset = buildAiPromptEnvelope({
         developerContext,
+        projectRulesContext,
         domains: workDomains,
         preferredTargets,
         executionPlan,
