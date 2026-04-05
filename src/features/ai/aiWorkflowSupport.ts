@@ -128,7 +128,112 @@ export const buildTailwindUiContract = () => [
   '- Gunakan token warna, spacing, radius, shadow, dan typography secara konsisten melalui kombinasi utility yang stabil.',
   '- Jika ada pola yang berulang, ekstrak ke komponen atau helper class yang masuk akal daripada mengulang blok utility yang kacau.',
   '- Jangan mencampur Tailwind dengan file CSS besar yang redundant kecuali benar-benar dibutuhkan untuk base layer atau animation khusus.',
-  '- Pastikan layout tetap bagus di mobile, tablet, dan desktop menggunakan breakpoint yang sengaja dipilih, bukan sekadar ditumpuk.'
+  '- Pastikan layout tetap bagus di mobile, tablet, dan desktop menggunakan breakpoint yang sengaja dipilih, bukan sekadar ditumpuk.',
+  '- Gunakan layout dengan gap yang konsisten dan hindari spacing acak yang sulit dirawat.',
+  '- Untuk komponen bergaya design-system, utamakan struktur utility yang tenang, reusable, dan mudah dipahami.'
+].join('\n');
+
+export const buildFrontendAppReadyContract = () => [
+  'Frontend App Ready Contract:',
+  '- Jika user meminta website, landing page, dashboard, toko online, atau web app, hasil akhir harus siap dijalankan sebagai aplikasi frontend nyata, bukan hanya kumpulan komponen lepas.',
+  '- Pastikan entrypoint utama benar-benar diganti dan terhubung, misalnya src/main.tsx dan src/App.tsx untuk Vite React biasa.',
+  '- Jika menggunakan Tailwind, dependency dan wiring yang dibutuhkan harus ikut dibuat atau diperbarui di package.json dan file style entry yang relevan.',
+  '- Jangan berhenti di satu hero section. Hasil minimal harus punya struktur halaman yang utuh, state dasar yang masuk akal, dan navigasi/CTA yang jelas jika konteksnya membutuhkan itu.',
+  '- Jika membuat komponen baru, pastikan komponen itu benar-benar diimpor dan dipakai oleh entry page utama.',
+  '- Jangan membuat file pendukung yatim yang tidak pernah dirender.',
+  '- Jika request mengarah ke produk/toko/dashboard, sertakan data mock, section pendukung, dan interaksi dasar yang membuat aplikasi terasa hidup.',
+  '- Pastikan preview tidak lagi menampilkan starter scaffold atau halaman kosong sebelum task dianggap selesai.'
+].join('\n');
+
+export const buildFrontendRealismContract = () => [
+  'Frontend Realism Contract:',
+  '- Jangan kirim website yang berisi link kosong seperti href="#", href="", to="#", to="", atau javascript:void(0), kecuali anchor itu benar-benar punya target id section yang ada di halaman.',
+  '- Untuk landing page atau website company, sertakan link navigasi dan CTA yang terasa nyata, misalnya ke #services, #about, #contact, /products, /services, mailto:, tel:, atau WhatsApp link.',
+  '- Untuk commerce, dashboard, katalog, atau app dengan banyak card, sertakan seed/mock data yang realistis dalam array atau module data agar UI terasa hidup dan tidak kosong.',
+  '- Untuk testimonial, layanan, pricing, produk, FAQ, atau team section, isi dengan data dummy yang believable: nama, label, ringkasan, harga, rating, lokasi, atau metadata lain yang relevan.',
+  '- Sertakan strategi gambar atau ilustrasi yang nyata: local asset di src/assets, inline SVG, URL gambar yang masuk akal, atau placeholder visual yang tetap intentional jika gambar gagal.',
+  '- Setiap gambar harus punya alt text yang jelas dan layout tetap utuh walau gambar tidak termuat.',
+  '- Hindari lorem ipsum, CTA generik tanpa tujuan, dan tombol yang tidak melakukan apa-apa.',
+  '- Jika request membutuhkan detail mendalam, utamakan realisme konten dan keterhubungan antar section sebelum menambah efek visual.',
+  '- Jika membuat website atau app yang tampak siap tayang, jangan berhenti di struktur visual saja. Pastikan ada data awal, target link, dan copy yang cukup rinci agar preview terasa seperti produk nyata.'
+].join('\n');
+
+const inferFrontendSeedProfile = (prompt: string) => {
+  if (/(dashboard|admin|analytics|crm|erp|saas|monitoring|backoffice)/i.test(prompt)) {
+    return [
+      '- Buat seed data dashboard yang nyata: sidebar nav, KPI cards, recent activity, alerts, chart series, dan 5-8 row tabel.',
+      '- Sertakan data user atau team summary, status badge, due date, dan metadata waktu agar panel tidak terasa kosong.',
+      '- Pastikan semua CTA seperti View detail, Manage, Export, atau Contact support mengarah ke route atau anchor nyata.'
+    ];
+  }
+
+  if (/(toko|store|shop|ecommerce|e-commerce|catalog|katalog|produk|product)/i.test(prompt)) {
+    return [
+      '- Buat seed data commerce yang realistis: kategori, 6-8 featured products, price, rating, stock state, badge promo, dan testimonial pembeli.',
+      '- Sertakan link nyata ke /products, /products/:slug, /cart, /checkout, atau anchor section yang sesuai.',
+      '- Sediakan gambar produk melalui local asset, inline SVG, atau URL gambar yang masuk akal dengan alt text yang baik.'
+    ];
+  }
+
+  if (/(bengkel|service|servis|agency|company|company profile|profil perusahaan|landing|website|bisnis|klinik|resto|restaurant|travel|hotel)/i.test(prompt)) {
+    return [
+      '- Buat seed data website bisnis yang realistis: nav links, 4-6 layanan atau value props, 3 testimonial, FAQ singkat, contact methods, dan service area atau jam operasional jika relevan.',
+      '- CTA utama harus punya tujuan nyata seperti #contact, #booking, tel:, mailto:, WhatsApp, atau halaman /services.',
+      '- Sertakan hero visual, service illustration, atau gallery starter agar halaman terasa hidup walau data masih dummy.'
+    ];
+  }
+
+  if (/(portfolio|creative|studio|freelance|personal brand|agency profile)/i.test(prompt)) {
+    return [
+      '- Buat seed data portfolio yang realistis: 3-6 project cards, client/result highlights, testimonial, process steps, social links, dan contact section.',
+      '- Gunakan link nyata ke #work, #about, #contact, GitHub, Dribbble, Behance, LinkedIn, atau halaman project.',
+      '- Sertakan visual preview project melalui local asset, inline SVG mockup, atau image URL yang masuk akal.'
+    ];
+  }
+
+  return [
+    '- Buat seed data dasar yang realistis: navigation links, supporting sections, 3-6 cards/item, testimonial atau trust proof, dan contact methods.',
+    '- Pastikan CTA dan navigation mengarah ke route, anchor, atau protocol link yang benar-benar dipakai halaman.',
+    '- Sediakan strategi visual nyata melalui asset lokal, SVG, atau image URL yang masuk akal dengan fallback yang tetap intentional.'
+  ];
+};
+
+export const buildFrontendSeedDataBlueprint = (prompt: string) => [
+  'Frontend Seed Data Blueprint:',
+  '- Jangan hanya membuat layout. Siapkan konten awal yang believable agar preview terlihat seperti produk nyata sejak pertama dijalankan.',
+  '- Jika membuat section berulang, selalu sediakan array data atau module seed agar konten mudah dirawat dan terasa konsisten.',
+  '- Jika memakai gambar, pilih salah satu: local asset di src/assets, inline SVG, atau URL gambar yang masuk akal. Jangan biarkan section visual kosong total.',
+  ...inferFrontendSeedProfile(prompt)
+].join('\n');
+
+export const buildWebProductionModeContract = () => [
+  'Web App Production Mode Contract:',
+  '- Untuk request web app/frontend biasa, gunakan satu app frontend tunggal yang deterministik.',
+  '- Arsitektur default yang diizinkan: package.json, index.html, tsconfig.json, vite.config.ts, postcss.config.js, tailwind.config.js, src/App.tsx, src/main.tsx, src/index.css, src/components/*, src/pages/*, src/lib/*, src/data/*, src/assets/*, src/hooks/*, src/types/*, src/utils/*.',
+  '- Jangan membuat struktur frontend tambahan seperti frontend/, client/, app-shell/, atau folder eksperimen lain kecuali user memintanya secara eksplisit.',
+  '- Jika memakai import alias internal, default-kan ke @/* -> src/* dan jaga agar config Vite/TypeScript tetap sinkron.',
+  '- Jangan membuat backend, API, atau Tauri files untuk request frontend biasa kecuali user memang memintanya.',
+  '- Fokuskan output ke aplikasi yang bisa langsung install, build, dan dev dengan jalur Vite React tunggal yang sehat.'
+].join('\n');
+
+export const buildMobileAppModeContract = () => [
+  'Mobile App Mode Contract:',
+  '- Untuk request mobile app, gunakan baseline Capacitor + React yang deterministik, bukan hanya halaman web yang dipersempit.',
+  '- Entry app tetap harus sehat sebagai Vite React app, tetapi tambahkan capacitor.config.ts yang valid untuk menyiapkan jalur hybrid mobile.',
+  '- Susun layar seperti aplikasi: app shell, header atau top bar, bottom navigation atau tab pattern bila cocok, dan screen-level sections yang terasa touch-first.',
+  '- Prioritaskan file di src/App.tsx, src/main.tsx, src/components/*, src/pages/* atau src/screens/*, src/data/*, dan capacitor.config.ts.',
+  '- Jaga touch targets nyaman, spacing lebih padat dari web desktop, dan hindari layout marketing page yang hanya disamarkan sebagai mobile app.',
+  '- Jika user meminta data nyata, siapkan seed data screen-friendly seperti cards, lists, stats, booking slots, vehicles, orders, notifications, atau account summaries sesuai konteks app.',
+  '- Jangan membuat folder android/ atau ios/ dari model secara bebas. Cukup siapkan scaffold konfigurasi dan aplikasi utama yang mobile-ready.'
+].join('\n');
+
+export const buildComponentSystemQualityGate = () => [
+  'Component System Quality Gate:',
+  '- Komponen harus memiliki tanggung jawab yang jelas dan nama yang sesuai isi.',
+  '- Hindari file CSS besar yang menumpuk semua styling jika struktur komponen dan utility sudah cukup.',
+  '- Untuk tombol, card, nav, dan section berulang, jaga konsistensi radius, spacing, border, dan hover state.',
+  '- Jangan campur gaya utility mentah, inline style, dan CSS ad-hoc tanpa alasan kuat.',
+  '- Jika memakai pola ala shadcn, pertahankan disiplin varian, spacing, dan semantic hierarchy alih-alih menimpa semuanya dengan warna mentah.'
 ].join('\n');
 
 export const buildAiPromptEnvelope = ({
@@ -160,12 +265,18 @@ export const buildAiPromptEnvelope = ({
     domainContext,
     targetContext,
     planContext,
-    domains.includes('frontend') || domains.includes('design-system') ? buildProfessionalUiContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') ? buildUiStyleDecisionContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') ? buildUiDesignSystemGenerationContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') ? buildUiAntiPatternGate() : '',
-    domains.includes('frontend') || domains.includes('design-system') ? buildUiCriticalQualityGate() : '',
-    domains.includes('frontend') || domains.includes('design-system') ? buildTailwindUiContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildProfessionalUiContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiStyleDecisionContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiDesignSystemGenerationContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiAntiPatternGate() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiCriticalQualityGate() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildTailwindUiContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildFrontendAppReadyContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildFrontendRealismContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildFrontendSeedDataBlueprint(prompt) : '',
+    domains.includes('frontend') || domains.includes('design-system') ? buildWebProductionModeContract() : '',
+    domains.includes('mobile') ? buildMobileAppModeContract() : '',
+    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildComponentSystemQualityGate() : '',
     buildWorkspaceOutputContract(),
     attachmentContext,
     `User Request:\n${prompt}`
@@ -312,8 +423,10 @@ export const buildAssistantChatContent = (generatedDraftCount: number, responseT
 
 export const shouldRunUiReviewLoop = (domains: string[], taskPreset: string) =>
   domains.includes('frontend') ||
+  domains.includes('mobile') ||
   domains.includes('design-system') ||
   taskPreset === 'frontend-ui' ||
+  taskPreset === 'mobile-app' ||
   taskPreset === 'fullstack';
 
 export const buildUiReviewLoopPrompt = ({
@@ -324,7 +437,8 @@ export const buildUiReviewLoopPrompt = ({
   checklist,
   generatedFiles,
   reviewMode = 'source',
-  previewSnapshotContext = ''
+  previewSnapshotContext = '',
+  forceRewrite = false
 }: {
   userPrompt: string;
   domains: string[];
@@ -334,6 +448,7 @@ export const buildUiReviewLoopPrompt = ({
   generatedFiles: Array<{ relativePath: string; content: string }>;
   reviewMode?: 'source' | 'preview';
   previewSnapshotContext?: string;
+  forceRewrite?: boolean;
 }) => {
   const fileSections = generatedFiles.map((file) => [
     `File: ${file.relativePath}`,
@@ -348,6 +463,7 @@ export const buildUiReviewLoopPrompt = ({
       ? 'Review the current runtime/frontend output critically as a senior design engineer using both preview snapshot data and source files.'
       : 'Review the generated frontend/UI output critically as a senior design engineer.',
     'Your job is to improve weak hierarchy, poor contrast, generic composition, broken spacing rhythm, weak typography, missing responsive behavior, weak CTA clarity, and bad fallback states.',
+    forceRewrite ? 'The current output is too weak. Do not make tiny refinements. Replace the main screen structure with a stronger, product-grade Tailwind implementation.' : '',
     'Only return files that actually need refinement.',
     'If no UI improvement is needed, respond exactly with: NO_UI_CHANGES_NEEDED',
     '',
@@ -362,6 +478,12 @@ export const buildUiReviewLoopPrompt = ({
     buildUiStyleDecisionContract(),
     buildUiCriticalQualityGate(),
     buildTailwindUiContract(),
+    buildFrontendAppReadyContract(),
+    buildFrontendRealismContract(),
+    buildFrontendSeedDataBlueprint(userPrompt),
+    buildWebProductionModeContract(),
+    domains.includes('mobile') || /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileAppModeContract() : '',
+    buildComponentSystemQualityGate(),
     '',
     'UI quality checklist:',
     ...checklist.map((item) => `- ${item}`),
@@ -416,9 +538,74 @@ export const buildStarterReplacementPrompt = ({
     buildUiStyleDecisionContract(),
     buildUiCriticalQualityGate(),
     buildTailwindUiContract(),
+    buildFrontendAppReadyContract(),
+    buildFrontendRealismContract(),
+    buildFrontendSeedDataBlueprint(userPrompt),
+    buildWebProductionModeContract(),
+    /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileAppModeContract() : '',
+    buildComponentSystemQualityGate(),
     buildWorkspaceOutputContract(),
     '',
     'Current generated files:',
     fileSections
+  ].filter(Boolean).join('\n');
+};
+
+export const buildVerificationRecoveryPrompt = ({
+  userPrompt,
+  failedCommand,
+  terminalOutput,
+  domains,
+  preferredTargets,
+  projectRulesContext = '',
+  relevantFiles
+}: {
+  userPrompt: string;
+  failedCommand: string;
+  terminalOutput: string;
+  domains: string[];
+  preferredTargets: string[];
+  projectRulesContext?: string;
+  relevantFiles: Array<{ relativePath: string; content: string }>;
+}) => {
+  const fileSections = relevantFiles.map((file) => [
+    `File: ${file.relativePath}`,
+    '```',
+    file.content,
+    '```'
+  ].join('\n')).join('\n\n');
+
+  return [
+    'Verification Recovery Loop:',
+    'A verification command failed after the AI wrote files to the workspace.',
+    'Your job is to fix the real cause of the failure using the smallest coherent set of file edits.',
+    'Do not rewrite the whole app unless the failure truly requires it.',
+    'Only return files that need to change.',
+    '',
+    `Original user request:\n${userPrompt}`,
+    '',
+    `Failed command: ${failedCommand}`,
+    '',
+    `Active domains: ${domains.join(', ')}`,
+    `Preferred targets:\n${preferredTargets.map((item) => `- ${item}`).join('\n') || '- workspace root'}`,
+    '',
+    projectRulesContext,
+    '',
+    buildProfessionalUiContract(),
+    buildUiCriticalQualityGate(),
+    buildTailwindUiContract(),
+    buildFrontendAppReadyContract(),
+    buildFrontendRealismContract(),
+    domains.includes('mobile') || /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileAppModeContract() : '',
+    buildComponentSystemQualityGate(),
+    buildWorkspaceOutputContract(),
+    '',
+    'Terminal failure log:',
+    '```text',
+    terminalOutput,
+    '```',
+    '',
+    'Relevant workspace files:',
+    fileSections || 'No relevant files were captured.'
   ].filter(Boolean).join('\n');
 };

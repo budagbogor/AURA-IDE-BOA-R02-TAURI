@@ -315,7 +315,7 @@ const appStore = createStore<AppState>((set) => ({
   terminalSessions: [{
     id: 'default',
     name: 'Terminal',
-    output: ['Welcome to AURA AI Terminal v15.3.115'],
+          output: ['Welcome to AURA AI Terminal v15.3.143'],
     cwd: undefined,
     processStatus: 'idle',
     lastExitCode: null,

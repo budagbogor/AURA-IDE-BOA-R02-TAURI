@@ -265,6 +265,24 @@ export const useTerminal = (
   }, [store.nativeProjectPath]);
 
   useEffect(() => {
+    if (store.terminalSessions.length <= 1) return;
+
+    const primarySession = store.terminalSessions.find((session) => session.id === store.activeTerminalId)
+      || store.terminalSessions[0];
+
+    const normalizedPrimary = {
+      ...primarySession,
+      id: 'default',
+      name: 'Terminal'
+    };
+
+    store.setTerminalSessions([normalizedPrimary]);
+    if (store.activeTerminalId !== 'default') {
+      store.setActiveTerminalId('default');
+    }
+  }, [store.terminalSessions, store.activeTerminalId]);
+
+  useEffect(() => {
     store.setProblems(parseTerminalProblems(currentSession?.output || []));
   }, [currentSession?.id, currentSession?.output]);
 
@@ -344,30 +362,14 @@ export const useTerminal = (
   };
 
   const addTerminalSession = () => {
-    const newId = `term-${Date.now()}`;
-    const newSession = {
-      id: newId,
-      name: `Terminal ${store.terminalSessions.length + 1}`,
-      output: [`[AURA] New session started at ${new Date().toLocaleTimeString()}`],
-      cwd: currentSession?.cwd || store.nativeProjectPath || undefined,
-      commandHistory: [],
-      historyIndex: -1
-    };
-    store.setTerminalSessions(prev => [...prev, newSession]);
-    store.setActiveTerminalId(newId);
+    store.setActiveTerminalId('default');
     setTerminalInput('');
   };
 
   const closeTerminalSession = async (id: string) => {
-    if (store.terminalSessions.length <= 1) return;
-    await terminalEngine.stop(id);
-    store.setTerminalSessions(prev => {
-      const filtered = prev.filter(s => s.id !== id);
-      if (store.activeTerminalId === id) {
-        store.setActiveTerminalId(filtered[0].id);
-      }
-      return filtered;
-    });
+    if (id !== 'default') {
+      await terminalEngine.stop(id);
+    }
   };
 
   return {

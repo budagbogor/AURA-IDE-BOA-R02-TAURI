@@ -3,7 +3,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { mkdir, writeTextFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  FolderOpen, Save, ChevronRight, PanelLeft, TerminalSquare, FileText, Play, Square,
+  FolderOpen, Save, ChevronRight, PanelLeft, TerminalSquare, FileText, Play, Square, LoaderCircle,
   Plus, X, ExternalLink, Sparkles, Eraser, GitBranch, RotateCcw, Settings2
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -24,6 +24,7 @@ import {
   buildAiPromptEnvelope,
   buildAttachmentPromptContext,
   buildStarterReplacementPrompt,
+  buildVerificationRecoveryPrompt,
   buildUiReviewLoopPrompt,
   isLikelyCodingPrompt,
   shouldRunUiReviewLoop
@@ -62,6 +63,8 @@ import {
   inferExecutionPlan,
   inferPreferredWorkspaceTargets,
   inferSuggestedVerificationCommands,
+  isUiFirstPrompt,
+  isWeakFrontendOutput,
   isTextAttachmentName,
   normalizePath,
   readWorkspaceFiles,
@@ -127,6 +130,11 @@ export default function AppFull() {
   const [aiModelSearch, setAiModelSearch] = useState('');
   const [cloneRepoUrl, setCloneRepoUrl] = useState('');
   const [cloneDestination, setCloneDestination] = useState('');
+  const [showConnectRepoModal, setShowConnectRepoModal] = useState(false);
+  const [connectRepoUrl, setConnectRepoUrl] = useState('');
+  const [connectRepoBranch, setConnectRepoBranch] = useState('main');
+  const [isConnectingRepo, setIsConnectingRepo] = useState(false);
+  const [detectedOriginUrl, setDetectedOriginUrl] = useState('');
   const [draftViewMode, setDraftViewMode] = useState<'editor' | 'diff'>('diff');
   const [openFileTabs, setOpenFileTabs] = useState<string[]>([]);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<string>('');
@@ -140,8 +148,11 @@ export default function AppFull() {
   const lastOpenedPreviewRef = useRef<string | null>(null);
   const verificationActivityByCommandRef = useRef<Record<string, string>>({});
   const verificationQueueByActivityRef = useRef<Record<string, string[]>>({});
-  const activityContextByIdRef = useRef<Record<string, { userPrompt: string; domains: string[]; preferredTargets: string[] }>>({});
+  const activityContextByIdRef = useRef<Record<string, { userPrompt: string; domains: string[]; preferredTargets: string[]; taskPresetId: string }>>({});
   const previewReviewAttemptedRef = useRef<Record<string, boolean>>({});
+  const verificationRecoveryAttemptsRef = useRef<Record<string, number>>({});
+  const latestVerificationActivityIdRef = useRef<string | null>(null);
+  const runtimeRecoverySignatureRef = useRef<Record<string, string>>({});
   const aiRunIdRef = useRef(0);
   const activeAiActivityIdRef = useRef<string | null>(null);
   const terminal = useTerminal(
@@ -331,6 +342,14 @@ export default function AppFull() {
     () => inferPreferredWorkspaceTargets(activeDomainFocus, store.files, store.nativeProjectPath, activeFile),
     [activeDomainFocus, store.files, store.nativeProjectPath, activeFile]
   );
+  const activeProcessingEntry = useMemo(() => {
+    if (!store.isAiLoading) return null;
+    const directMatch = activeAiActivityIdRef.current
+      ? aiActivityEntries.find((entry) => entry.id === activeAiActivityIdRef.current)
+      : null;
+    if (directMatch) return directMatch;
+    return aiActivityEntries.find((entry) => entry.status === 'planning' || entry.status === 'working') || null;
+  }, [aiActivityEntries, store.isAiLoading]);
   const activeTestMeta = store.testMeta[store.aiProvider];
   const visualReviewProviderOptions = useMemo(
     () => [{ id: 'same', name: 'Same as Coding Provider' }, ...AI_PROVIDERS],
@@ -385,13 +404,11 @@ export default function AppFull() {
       },
       ...prev
     ]);
-    setActiveWorkspaceTab(AI_ACTIVITY_TAB_ID);
     return entryId;
   };
 
   const pushAiActivityEntry = (entry: AiActivityEntry) => {
     setAiActivityEntries((prev) => [entry, ...prev]);
-    setActiveWorkspaceTab(AI_ACTIVITY_TAB_ID);
     return entry.id;
   };
 
@@ -494,6 +511,7 @@ export default function AppFull() {
 
   const runVerificationCommandForActivity = (activityId: string, command: string, detail: string) => {
     verificationActivityByCommandRef.current[command.toLowerCase()] = activityId;
+    latestVerificationActivityIdRef.current = activityId;
     upsertVerificationStep(activityId, command, 'working', detail);
     store.setShowBottomPanel(true);
     terminal.appendTerminalOutput(`[AURA] Menjalankan verifikasi dari AI Activity: ${command}`);
@@ -510,6 +528,183 @@ export default function AppFull() {
       firstCommand,
       'Verifikasi otomatis dimulai dari alur AI setelah file berhasil ditulis ke workspace.'
     );
+  };
+
+  const detectRecoverableRuntimeError = (lines: string[]) => {
+    const windowLines = lines.slice(-80);
+    const joined = windowLines.join('\n');
+    if (!joined.trim()) return null;
+
+    const patterns = [
+      /Failed to resolve import/i,
+      /Cannot apply unknown utility class/i,
+      /Failed to load PostCSS config/i,
+      /Transform failed with \d+ error/i,
+      /\[plugin:vite:import-analysis\]/i,
+      /\[plugin:vite:css\]/i,
+      /\[@tailwindcss\/vite:generate:(?:serve|build)\]/i,
+      /Does the file exist\?/i
+    ];
+
+    if (!patterns.some((pattern) => pattern.test(joined))) {
+      return null;
+    }
+
+    return windowLines.slice(-20).join('\n');
+  };
+
+  const generateCurrentProviderResponse = (promptWithPreset: string, attachments: AttachedFile[] = []) =>
+    generateAiProviderResponse({
+      provider: store.aiProvider,
+      promptWithPreset,
+      attachments,
+      historyBeforePrompt: [],
+      temperature: store.aiTemperature,
+      geminiApiKey: store.geminiApiKey,
+      selectedModel: store.selectedModel,
+      openRouterApiKey: store.openRouterApiKey,
+      openRouterModel: store.openRouterModel,
+      bytezApiKey: store.bytezApiKey,
+      bytezModel: store.bytezModel,
+      sumopodApiKey: store.sumopodApiKey,
+      sumopodModel: store.sumopodModel,
+      puterModel: store.puterModel
+    });
+
+  const collectVerificationRecoveryFiles = (preferredTargets: string[]) => {
+    const normalizedTargets = preferredTargets.map((target) => normalizePath(target).replace(/^\/+/, ''));
+    const candidateFiles = [...store.files]
+      .filter((file) => /\.(tsx?|jsx?|css|scss|sass|less|html|json|mjs|cjs)$/i.test(file.name))
+      .map((file) => ({
+        ...file,
+        relativePath: getRelativeFilePath(file.id, store.nativeProjectPath || '')
+      }))
+      .sort((a, b) => {
+        const aPreferred = normalizedTargets.some((target) => a.relativePath.startsWith(target));
+        const bPreferred = normalizedTargets.some((target) => b.relativePath.startsWith(target));
+        if (aPreferred !== bPreferred) return aPreferred ? -1 : 1;
+        return a.relativePath.localeCompare(b.relativePath);
+      })
+      .slice(0, 16);
+
+    return candidateFiles.map((file) => ({
+      relativePath: file.relativePath,
+      content: file.content.length > 16000
+        ? `${file.content.slice(0, 16000)}\n/* ...truncated for verification recovery... */`
+        : file.content
+    }));
+  };
+
+  const runVerificationRecoveryLoop = async ({
+    activityId,
+    failedCommand,
+    recoveryMode = 'verification-failure'
+  }: {
+    activityId: string;
+    failedCommand: string;
+    recoveryMode?: 'verification-failure' | 'runtime-error';
+  }) => {
+    const context = activityContextByIdRef.current[activityId];
+    if (!context) return false;
+
+    const attempts = verificationRecoveryAttemptsRef.current[activityId] || 0;
+    if (attempts >= 1) {
+      return false;
+    }
+
+    const normalizedCommand = failedCommand.trim().toLowerCase();
+    const canRecoverVerificationFailure = /(install|build|lint)/.test(normalizedCommand);
+    const canRecoverRuntimeError =
+      recoveryMode === 'runtime-error' &&
+      normalizedCommand === workspacePackageManager.devCommand.toLowerCase();
+
+    if (!canRecoverVerificationFailure && !canRecoverRuntimeError) {
+      return false;
+    }
+
+    verificationRecoveryAttemptsRef.current[activityId] = attempts + 1;
+    const terminalLines = terminal.currentSession?.output || [];
+    const terminalOutput = terminalLines.slice(-120).join('\n').trim() || 'No terminal output captured.';
+    const relevantFiles = collectVerificationRecoveryFiles(context.preferredTargets);
+
+    appendAiActivityStep(activityId, {
+      label: 'Auto Fix Loop',
+      detail: recoveryMode === 'runtime-error'
+        ? `AURA mendeteksi error runtime saat \`${failedCommand}\` masih berjalan dan mencoba memperbaikinya otomatis.`
+        : `Verifikasi \`${failedCommand}\` gagal. AURA mencoba memperbaiki penyebab error dari log terminal lalu menjalankan ulang command.`,
+      status: 'working'
+    });
+
+    const recoveryPrompt = buildVerificationRecoveryPrompt({
+      userPrompt: context.userPrompt,
+      failedCommand,
+      terminalOutput,
+      domains: context.domains,
+      preferredTargets: context.preferredTargets,
+      projectRulesContext: buildProjectRulesContext({
+        files: useAppStore.getState().files,
+        rootPath: store.nativeProjectPath,
+        activeFilePath: activeFile?.path || activeFile?.id || null,
+        prompt: context.userPrompt,
+        domains: context.domains
+      }),
+      relevantFiles
+    });
+
+    const responseText = await generateCurrentProviderResponse(recoveryPrompt);
+    const recoveryBundle = prepareAiDraftBundle({
+      responseText,
+      activeFile,
+      nativeProjectPath: store.nativeProjectPath,
+      preferredTargets: context.preferredTargets,
+      files: useAppStore.getState().files,
+      domains: context.domains
+    });
+
+    if (recoveryBundle.generatedFiles.length === 0) {
+      appendAiActivityStep(activityId, {
+        label: 'Auto Fix Loop',
+        detail: 'Model tidak mengembalikan patch perbaikan yang valid untuk recovery loop.',
+        status: 'error'
+      });
+      return false;
+    }
+
+    for (const draft of recoveryBundle.nextDrafts) {
+      appendAiActivityStep(activityId, {
+        label: `Recovery Write • ${getRelativeFilePath(draft.path, store.nativeProjectPath || '')}`,
+        detail: `Menulis perbaikan recovery ke ${draft.path}.`,
+        status: 'working'
+      });
+      await applyResolvedDraft(draft);
+      upsertWorkspaceFile(draft.path, draft.newContent);
+      openCenterFile(draft.path);
+      appendAiActivityStep(activityId, {
+        label: `Recovery Write • ${getRelativeFilePath(draft.path, store.nativeProjectPath || '')}`,
+        detail: `Perbaikan recovery selesai untuk ${draft.path}.`,
+        status: 'done'
+      });
+    }
+
+    await refreshWorkspaceFromDisk();
+
+    appendAiActivityStep(activityId, {
+      label: 'Auto Fix Loop',
+      detail: `Recovery loop menulis ${recoveryBundle.generatedFiles.length} file dan menjalankan ulang \`${failedCommand}\`.`,
+      status: 'done'
+    });
+
+    updateAiActivity(activityId, {
+      status: 'working',
+      summary: `AURA mencoba recovery otomatis setelah \`${failedCommand}\` gagal.`
+    });
+
+    runVerificationCommandForActivity(
+      activityId,
+      failedCommand,
+      `Recovery loop menjalankan ulang \`${failedCommand}\` setelah menerapkan patch otomatis.`
+    );
+    return true;
   };
 
   const collectPreviewReviewFiles = (preferredTargets: string[]) => {
@@ -541,21 +736,28 @@ export default function AppFull() {
     userPrompt,
     domains,
     preferredTargets,
+    taskPresetId,
     generatedFiles
   }: {
     activityId: string;
     userPrompt: string;
     domains: string[];
     preferredTargets: string[];
+    taskPresetId: string;
     generatedFiles: PreparedAiDraftBundle['generatedFiles'];
   }) => {
-    if (!shouldRunUiReviewLoop(domains, store.aiTaskPreset) || generatedFiles.length === 0) {
+    if (!shouldRunUiReviewLoop(domains, taskPresetId) || generatedFiles.length === 0) {
       return { refinedCount: 0, suggestedCommands: [] as Array<{ label: string; command: string; reason: string }> };
     }
 
+    const reviewPreset = DEVELOPER_TASK_PRESETS.find((preset) => preset.id === taskPresetId) || activeTaskPreset;
+    const weakUiOutput = isWeakFrontendOutput(generatedFiles, userPrompt);
+
     appendAiActivityStep(activityId, {
       label: 'UI Review',
-      detail: 'Menjalankan quality gate UI/UX otomatis untuk mengkritik hierarchy, contrast, spacing, fallback state, dan polish visual.',
+      detail: weakUiOutput
+        ? 'Output awal terlalu lemah, jadi quality gate memaksa regenerasi UI utama dengan struktur yang lebih kuat.'
+        : 'Menjalankan quality gate UI/UX otomatis untuk mengkritik hierarchy, contrast, spacing, fallback state, dan polish visual.',
       status: 'working'
     });
 
@@ -571,9 +773,10 @@ export default function AppFull() {
         domains
       }),
       checklist: [
-        ...(activeTaskPreset.executionChecklist || []),
+        ...(reviewPreset.executionChecklist || []),
         ...((activeCollectiveSkill?.checklist || []).slice(0, 6))
       ],
+      forceRewrite: weakUiOutput,
       generatedFiles: generatedFiles.map((file) => ({
         relativePath: file.relativePath,
         content: file.content
@@ -658,7 +861,9 @@ export default function AppFull() {
 
     const context = activityContextByIdRef.current[activityId];
     if (!context) return;
-    if (!shouldRunUiReviewLoop(context.domains, store.aiTaskPreset)) return;
+    if (!shouldRunUiReviewLoop(context.domains, context.taskPresetId)) return;
+
+    const reviewPreset = DEVELOPER_TASK_PRESETS.find((preset) => preset.id === context.taskPresetId) || activeTaskPreset;
 
     previewReviewAttemptedRef.current[activityId] = true;
 
@@ -780,7 +985,7 @@ export default function AppFull() {
           domains: context.domains
         }),
         checklist: [
-          ...(activeTaskPreset.executionChecklist || []),
+          ...(reviewPreset.executionChecklist || []),
           ...((activeCollectiveSkill?.checklist || []).slice(0, 6))
         ],
         generatedFiles: collectPreviewReviewFiles(context.preferredTargets),
@@ -1043,6 +1248,62 @@ export default function AppFull() {
   }, [devServerUrl, previewRefreshKey]);
 
   useEffect(() => {
+    const currentCommand = terminal.currentSession?.currentCommand?.trim().toLowerCase();
+    const processStatus = terminal.currentSession?.processStatus;
+    const output = terminal.currentSession?.output || [];
+    const devCommand = workspacePackageManager.devCommand.toLowerCase();
+
+    if (currentCommand !== devCommand) return;
+    if (processStatus !== 'running') return;
+
+    const runtimeErrorLog = detectRecoverableRuntimeError(output);
+    if (!runtimeErrorLog) return;
+
+    const activityId =
+      verificationActivityByCommandRef.current[devCommand] ||
+      latestVerificationActivityIdRef.current;
+    if (!activityId) return;
+
+    const nextSignature = `${activityId}::${runtimeErrorLog}`;
+    if (runtimeRecoverySignatureRef.current[activityId] === nextSignature) {
+      return;
+    }
+    runtimeRecoverySignatureRef.current[activityId] = nextSignature;
+
+    appendAiActivityStep(activityId, {
+      label: 'Runtime Error Watch',
+      detail: 'AURA mendeteksi error runtime dari dev server dan memulai recovery otomatis.',
+      status: 'working'
+    });
+
+    void runVerificationRecoveryLoop({
+      activityId,
+      failedCommand: workspacePackageManager.devCommand,
+      recoveryMode: 'runtime-error'
+    }).then((recovered) => {
+      if (!recovered) {
+        appendAiActivityStep(activityId, {
+          label: 'Runtime Error Watch',
+          detail: 'AURA mendeteksi error runtime, tetapi belum menemukan patch otomatis yang valid.',
+          status: 'error'
+        });
+      }
+    }).catch((error) => {
+      console.warn('[AURA] Runtime recovery failed:', error);
+      appendAiActivityStep(activityId, {
+        label: 'Runtime Error Watch',
+        detail: 'Recovery otomatis dari runtime error gagal dijalankan.',
+        status: 'error'
+      });
+    });
+  }, [
+    terminal.currentSession?.currentCommand,
+    terminal.currentSession?.processStatus,
+    terminal.currentSession?.output,
+    workspacePackageManager.devCommand
+  ]);
+
+  useEffect(() => {
     if (!store.showAiPanel) return;
     if (store.aiProvider === 'openrouter' || store.aiProvider === 'puter') {
       void aiManager.refreshModels();
@@ -1225,13 +1486,30 @@ export default function AppFull() {
     onVerificationResolved: ({ activityId, succeeded, command }) => {
       const queue = verificationQueueByActivityRef.current[activityId] || [];
       if (!succeeded) {
-        verificationQueueByActivityRef.current[activityId] = [];
-        updateAiActivity(activityId, {
-          status: 'error',
-          summary: `Verifikasi berhenti di \`${command}\`. Cek terminal untuk detail error sebelum melanjutkan.`
-        });
+        void (async () => {
+          const recovered = await runVerificationRecoveryLoop({
+            activityId,
+            failedCommand: command
+          }).catch((error) => {
+            console.warn('[AURA] Verification recovery failed:', error);
+            return false;
+          });
+
+          if (recovered) {
+            return;
+          }
+
+          verificationQueueByActivityRef.current[activityId] = [];
+          updateAiActivity(activityId, {
+            status: 'error',
+            summary: `Verifikasi berhenti di \`${command}\`. Cek terminal untuk detail error sebelum melanjutkan.`
+          });
+        })();
         return;
       }
+
+      verificationRecoveryAttemptsRef.current[activityId] = 0;
+      runtimeRecoverySignatureRef.current[activityId] = '';
 
       if (
         queue.length === 0 &&
@@ -1346,7 +1624,7 @@ export default function AppFull() {
 
       setWorkspaceFolders(loadedFolders);
       store.setNativeProjectPath(targetPath);
-      store.setProjectName(getWorkspaceDisplayName(targetPath, repoName.toUpperCase()));
+      store.setProjectName(getWorkspaceDisplayName(targetPath, repoName));
       store.setFiles(loadedFiles);
         if (loadedFiles[0]?.id) {
           openCenterFile(loadedFiles[0].id);
@@ -1373,6 +1651,191 @@ export default function AppFull() {
       setWorkspaceError(error?.message || 'Failed to clone repository.');
     } finally {
       setIsCloningRepo(false);
+    }
+  };
+
+  const runGitCommandInWorkspace = async (
+    args: string[],
+    cwd: string,
+    env?: Record<string, string>
+  ) => {
+    const { Command } = await import('@tauri-apps/plugin-shell');
+    const outputLines: string[] = [];
+    const command = Command.create('git', args, {
+      cwd,
+      env: {
+        GIT_TERMINAL_PROMPT: '0',
+        ...env
+      }
+    });
+
+    command.stdout.on('data', (data) => {
+      const chunk = `${data}`.trim();
+      if (chunk) outputLines.push(chunk);
+    });
+
+    command.stderr.on('data', (data) => {
+      const chunk = `${data}`.trim();
+      if (chunk) outputLines.push(chunk);
+    });
+
+    const result = await command.execute();
+    return {
+      code: result.code,
+      output: outputLines.join('\n').trim()
+    };
+  };
+
+  const buildGitPushArgs = (branchName: string, repoUrl: string) => {
+    const githubToken = localStorage.getItem('aura_github_token') || '';
+    const normalizedRepoUrl = repoUrl.trim().toLowerCase();
+    if (githubToken && normalizedRepoUrl.startsWith('https://github.com/')) {
+      const auth = btoa(`x-access-token:${githubToken}`);
+      return ['-c', `http.extraHeader=AUTHORIZATION: Basic ${auth}`, 'push', '-u', 'origin', branchName];
+    }
+    return ['push', '-u', 'origin', branchName];
+  };
+
+  const inspectWorkspaceGitConnection = async (workspacePath: string) => {
+    const { exists } = await import('@tauri-apps/plugin-fs');
+    const normalizedWorkspace = normalizePath(workspacePath);
+    const hasLocalGit = await exists(`${normalizedWorkspace}/.git`);
+    let originUrl = '';
+
+    if (hasLocalGit) {
+      try {
+        const remoteResult = await runGitCommandInWorkspace(['config', '--get', 'remote.origin.url'], normalizedWorkspace);
+        if (remoteResult.code === 0) {
+          originUrl = remoteResult.output.trim();
+        }
+      } catch {
+        originUrl = '';
+      }
+    }
+
+    return {
+      hasLocalGit,
+      originUrl
+    };
+  };
+
+  const handleOpenConnectRepoModal = async () => {
+    if (!store.nativeProjectPath) {
+      setWorkspaceError('Buka workspace proyek dulu sebelum menghubungkan repository GitHub.');
+      return;
+    }
+
+    try {
+      const gitInfo = await inspectWorkspaceGitConnection(store.nativeProjectPath);
+      setDetectedOriginUrl(gitInfo.originUrl);
+      setConnectRepoUrl(gitInfo.originUrl || '');
+      setConnectRepoBranch('main');
+      setShowConnectRepoModal(true);
+      setActiveMenu(null);
+    } catch (error: any) {
+      setWorkspaceError(error?.message || 'Gagal membaca status Git workspace.');
+    }
+  };
+
+  const handleConnectRepository = async () => {
+    const workspacePath = store.nativeProjectPath ? normalizePath(store.nativeProjectPath) : '';
+    const repoUrl = connectRepoUrl.trim();
+    const branchName = connectRepoBranch.trim() || 'main';
+
+    if (!workspacePath) {
+      setWorkspaceError('Workspace aktif belum tersedia.');
+      return;
+    }
+
+    if (!repoUrl) {
+      setWorkspaceError('URL repository GitHub wajib diisi.');
+      return;
+    }
+
+    setIsConnectingRepo(true);
+    setWorkspaceError(null);
+
+    try {
+      const gitInfo = await inspectWorkspaceGitConnection(workspacePath);
+      terminal.appendTerminalOutput(`[AURA] Menyiapkan koneksi Git untuk workspace: ${workspacePath}`);
+
+      if (!gitInfo.hasLocalGit) {
+        terminal.appendTerminalOutput('[AURA] Repo Git lokal belum ada. Menjalankan `git init`...');
+        const initResult = await runGitCommandInWorkspace(['init'], workspacePath);
+        if (initResult.code !== 0) {
+          throw new Error(initResult.output || 'git init failed.');
+        }
+      }
+
+      const branchResult = await runGitCommandInWorkspace(['branch', '-M', branchName], workspacePath);
+      if (branchResult.code === 0) {
+        terminal.appendTerminalOutput(`[AURA] Branch default diarahkan ke ${branchName}.`);
+      }
+
+      const refreshedGitInfo = await inspectWorkspaceGitConnection(workspacePath);
+      if (refreshedGitInfo.originUrl) {
+        if (normalizePath(refreshedGitInfo.originUrl) !== normalizePath(repoUrl)) {
+          terminal.appendTerminalOutput(`[AURA] Remote origin lama terdeteksi: ${refreshedGitInfo.originUrl}`);
+          const setUrlResult = await runGitCommandInWorkspace(['remote', 'set-url', 'origin', repoUrl], workspacePath);
+          if (setUrlResult.code !== 0) {
+            throw new Error(setUrlResult.output || 'git remote set-url origin failed.');
+          }
+          terminal.appendTerminalOutput(`[AURA] Remote origin diperbarui ke ${repoUrl}`);
+        } else {
+          terminal.appendTerminalOutput(`[AURA] Remote origin sudah mengarah ke ${repoUrl}`);
+        }
+      } else {
+        const addRemoteResult = await runGitCommandInWorkspace(['remote', 'add', 'origin', repoUrl], workspacePath);
+        if (addRemoteResult.code !== 0) {
+          throw new Error(addRemoteResult.output || 'git remote add origin failed.');
+        }
+        terminal.appendTerminalOutput(`[AURA] Remote origin berhasil ditambahkan: ${repoUrl}`);
+      }
+
+      terminal.appendTerminalOutput('[AURA] Menambahkan semua perubahan workspace ke staging...');
+      const addAllResult = await runGitCommandInWorkspace(['add', '-A'], workspacePath);
+      if (addAllResult.code !== 0) {
+        throw new Error(addAllResult.output || 'git add -A failed.');
+      }
+
+      const stagedStatusResult = await runGitCommandInWorkspace(['status', '--porcelain'], workspacePath);
+      if (stagedStatusResult.code !== 0) {
+        throw new Error(stagedStatusResult.output || 'git status --porcelain failed.');
+      }
+
+      const hasChangesToCommit = Boolean(stagedStatusResult.output.trim());
+      if (hasChangesToCommit) {
+        terminal.appendTerminalOutput('[AURA] Membuat commit otomatis untuk sinkronisasi workspace...');
+        const commitResult = await runGitCommandInWorkspace(
+          ['commit', '-m', 'chore: publish workspace from AURA IDE'],
+          workspacePath
+        );
+        if (commitResult.code !== 0) {
+          throw new Error(commitResult.output || 'git commit failed.');
+        }
+      } else {
+        terminal.appendTerminalOutput('[AURA] Tidak ada perubahan baru untuk di-commit. Melanjutkan ke proses push.');
+      }
+
+      terminal.appendTerminalOutput(`[AURA] Mendorong branch ${branchName} ke GitHub...`);
+      const pushArgs = buildGitPushArgs(branchName, repoUrl);
+      const pushResult = await runGitCommandInWorkspace(pushArgs, workspacePath);
+      if (pushResult.code !== 0) {
+        throw new Error(
+          pushResult.output ||
+          'git push failed. Pastikan token GitHub di Settings sudah benar atau remote repo menerima kredensial Git kamu.'
+        );
+      }
+
+      setDetectedOriginUrl(repoUrl);
+      setShowConnectRepoModal(false);
+      terminal.appendTerminalOutput('[AURA] Workspace berhasil dipublish ke GitHub. Repo lokal, remote origin, commit, dan push sudah selesai otomatis.');
+    } catch (error: any) {
+      const message = error?.message || 'Gagal menghubungkan workspace ke repository GitHub.';
+      setWorkspaceError(message);
+      terminal.appendTerminalOutput(`[AURA ERROR] ${message}`);
+    } finally {
+      setIsConnectingRepo(false);
     }
   };
 
@@ -1558,6 +2021,26 @@ export default function AppFull() {
     event.target.value = '';
   };
 
+  const handleOpenChatAttachmentPicker = async () => {
+    if (chatFileInputRef.current) {
+      chatFileInputRef.current.click();
+      return;
+    }
+
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: true,
+        title: 'Attach Files or Images'
+      });
+
+      if (!selected) return;
+      setWorkspaceError('Fallback attach via native dialog belum lengkap. Hidden file input sekarang dipakai sebagai jalur utama.');
+    } catch (error: any) {
+      setWorkspaceError(error?.message || 'Failed to open attachment picker.');
+    }
+  };
+
   const applyAiResponseToWorkspace = async (
     draftBundle: PreparedAiDraftBundle,
     activityId?: string | null,
@@ -1626,6 +2109,7 @@ export default function AppFull() {
             userPrompt: originalPrompt,
             domains,
             preferredTargets,
+            taskPresetId: activityContextByIdRef.current[activityId]?.taskPresetId || store.aiTaskPreset,
             generatedFiles
           });
           const finalSuggestedCommands = reviewResult.suggestedCommands.length > 0
@@ -1695,6 +2179,7 @@ export default function AppFull() {
             userPrompt: originalPrompt,
             domains,
             preferredTargets,
+            taskPresetId: activityContextByIdRef.current[activityId]?.taskPresetId || store.aiTaskPreset,
             generatedFiles
           });
           const finalSuggestedCommands = reviewResult.suggestedCommands.length > 0 ? reviewResult.suggestedCommands : suggestedCommands;
@@ -1733,6 +2218,15 @@ export default function AppFull() {
     logDiagnostic('info', 'ai', 'Prompt send requested', prompt.slice(0, 160));
     const attachments = [...store.attachedFiles] as AttachedFile[];
     const workDomains = detectWorkDomains(prompt, activeFile, store.files);
+    const uiFirstPrompt = isUiFirstPrompt(prompt);
+    const mobileFirstPrompt = /(mobile|android|ios|apk|capacitor|native app|aplikasi mobile)/i.test(prompt);
+    const effectiveTaskPresetId = mobileFirstPrompt && store.aiTaskPreset === 'fullstack'
+      ? 'mobile-app'
+      : uiFirstPrompt && store.aiTaskPreset === 'fullstack'
+        ? 'frontend-ui'
+        : store.aiTaskPreset;
+    const effectiveTaskPreset = DEVELOPER_TASK_PRESETS.find((preset) => preset.id === effectiveTaskPresetId) || activeTaskPreset;
+    const effectiveSkillName = effectiveTaskPreset.skillId || store.selectedSkill;
     const preferredTargets = inferPreferredWorkspaceTargets(workDomains, store.files, store.nativeProjectPath, activeFile);
     const executionPlan = inferExecutionPlan(workDomains, preferredTargets, prompt);
     const projectRulesContext = buildProjectRulesContext({
@@ -1771,12 +2265,14 @@ export default function AppFull() {
         activityContextByIdRef.current[activityId] = {
           userPrompt: prompt,
           domains: workDomains,
-          preferredTargets
+          preferredTargets,
+          taskPresetId: effectiveTaskPresetId
         };
         previewReviewAttemptedRef.current[activityId] = false;
+        verificationRecoveryAttemptsRef.current[activityId] = 0;
       }
       let responseText = '';
-      const developerContext = buildDeveloperPromptPrefix(store.aiTaskPreset, store.selectedSkill);
+      const developerContext = buildDeveloperPromptPrefix(effectiveTaskPresetId, effectiveSkillName);
       const attachmentContext = buildAttachmentPromptContext(attachments);
       const promptWithPreset = buildAiPromptEnvelope({
         developerContext,
@@ -1873,7 +2369,7 @@ export default function AppFull() {
       const basePath = normalizePath(path);
       const normalizedProjectName = projectName.trim().replace(/[^\w-]+/g, '-');
       const projectRoot = normalizePath(`${basePath}/${normalizedProjectName}`);
-      const { srcRoot, filesToWrite } = buildStarterProjectFiles(projectRoot, projectName);
+      const { srcRoot, filesToWrite, initialFilePath } = buildStarterProjectFiles(projectRoot, projectName);
 
       await mkdir(srcRoot, { recursive: true });
       for (const file of filesToWrite) {
@@ -1886,14 +2382,21 @@ export default function AppFull() {
       ]);
       setWorkspaceFolders(loadedFolders);
       store.setNativeProjectPath(projectRoot);
-      store.setProjectName(getWorkspaceDisplayName(projectRoot, normalizedProjectName.toUpperCase()));
+      store.setProjectName(getWorkspaceDisplayName(projectRoot, normalizedProjectName));
       store.setFiles(loadedFiles);
-        if (loadedFiles[0]?.id) {
-          openCenterFile(loadedFiles[0].id);
+      if (initialFilePath) {
+        const initialFile = loadedFiles.find((file) => normalizePath(file.id) === normalizePath(initialFilePath));
+        if (initialFile?.id) {
+          openCenterFile(initialFile.id);
         } else {
           store.setActiveFileId('');
           setActiveWorkspaceTab('');
         }
+      } else {
+        store.setActiveFileId('');
+        setOpenFileTabs([]);
+        setActiveWorkspaceTab('');
+      }
       store.setShowSidebar(true);
       store.setShowAiPanel(true);
       store.setShowBottomPanel(true);
@@ -2084,14 +2587,14 @@ export default function AppFull() {
                 <button onClick={() => { store.setShowAiPanel((prev) => !prev); setActiveMenu(null); }} className={menuItemClassName}>
                   <Sparkles size={14} /> Toggle AI
                 </button>
-                <button onClick={() => { terminal.addTerminalSession(); setActiveMenu(null); }} className={menuItemClassName}>
-                  <Plus size={14} /> New Terminal
-                </button>
                 <button onClick={() => { terminal.clearTerminalSession(); setActiveMenu(null); }} className={menuItemClassName}>
                   <Eraser size={14} /> Clear Terminal
                 </button>
                 <button onClick={() => { terminal.executeTerminalCommand('git status'); setActiveMenu(null); }} className={menuItemClassName}>
                   <GitBranch size={14} /> Git Status
+                </button>
+                <button onClick={() => { void handleOpenConnectRepoModal(); }} className={menuItemClassName}>
+                  <ExternalLink size={14} /> Connect GitHub Repo
                 </button>
                 <button onClick={() => { setIsCloningRepo(true); setActiveMenu(null); }} className={menuItemClassName}>
                   <GitBranch size={14} /> Clone Repository
@@ -2528,6 +3031,15 @@ export default function AppFull() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
+                  {terminal.currentSession?.isRunning ? (
+                    <div className="inline-flex max-w-[280px] items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-100">
+                      <LoaderCircle size={11} className="shrink-0 animate-spin" />
+                      <span className="shrink-0">Running</span>
+                      {terminal.currentSession.currentCommand ? (
+                        <span className="truncate text-emerald-200/90">{terminal.currentSession.currentCommand}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <button
                     onClick={() => terminalEngine.stop(store.activeTerminalId, terminal.appendTerminalOutput)}
                     disabled={!terminal.currentSession?.isRunning}
@@ -2553,6 +3065,7 @@ export default function AppFull() {
                         id={terminal.currentSession.id}
                         output={terminal.currentSession.output}
                         isRunning={!!terminal.currentSession.isRunning}
+                        currentCommand={terminal.currentSession.currentCommand}
                       />
                     </div>
                     <div className="flex h-9 shrink-0 items-center gap-2 border-t border-white/5 bg-[#0b0b0b] px-3 font-mono text-[12px] text-[#9fb7d8]">
@@ -2616,6 +3129,7 @@ export default function AppFull() {
                 activeModel={aiManager.activeModel}
                 modelOptions={aiModelOptions}
                 taskPreset={activeTaskPreset}
+                taskPresetOptions={DEVELOPER_TASK_PRESETS}
                 selectedSkill={store.selectedSkill}
                 activeSkill={activeCollectiveSkill}
                 testingStatus={store.testingStatus[store.aiProvider]}
@@ -2626,17 +3140,19 @@ export default function AppFull() {
                 chatInput={store.chatInput}
                 attachedFiles={store.attachedFiles}
                 isAiLoading={store.isAiLoading}
+                processingEntry={activeProcessingEntry}
                 onOpenSettings={() => setShowAiSettings(true)}
                 onClearChat={() => {
                   store.setChatMessages([]);
                   store.setAttachedFiles([]);
                 }}
                 onClosePanel={() => store.setShowAiPanel(false)}
+                onChangeTaskPreset={handleApplyDeveloperTaskPreset}
                 onChangeChatInput={(value) => store.setChatInput(value)}
                 onSendPrompt={handleSendAiPrompt}
                 onStopPrompt={handleStopAiPrompt}
                 onRemoveAttachment={removeChatAttachment}
-                onOpenAttach={() => chatFileInputRef.current?.click()}
+                onOpenAttach={() => void handleOpenChatAttachmentPicker()}
                 onTextareaKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
@@ -2654,6 +3170,15 @@ export default function AppFull() {
         <div>{activeFile?.language || 'workspace-shell'}</div>
         <div>{store.files.length} files loaded</div>
       </div>
+
+      <input
+        ref={chatFileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.txt,.md,.mdx,.json,.jsonc,.ts,.tsx,.js,.jsx,.css,.scss,.sass,.less,.html,.htm,.yml,.yaml,.toml,.env,.gitignore,.npmrc,.sh,.ps1,.bat,.cmd,.rs,.py,.java,.kt,.go,.c,.cpp,.h,.hpp,.cs,.php,.rb,.swift,.sql,.prisma,.xml,.svg"
+        className="hidden"
+        onChange={handleChatFileUpload}
+      />
 
       <AiSettingsModal
         isOpen={showAiSettings}
@@ -2760,6 +3285,75 @@ export default function AppFull() {
               >
                 Clone & Open
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConnectRepoModal && (
+        <div className="fixed inset-0 z-[121] flex items-start justify-center bg-black/50 px-4 pt-24 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#1e1e1e] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <ExternalLink size={15} className="text-emerald-400" />
+                Connect GitHub Repository
+              </div>
+              <button
+                onClick={() => setShowConnectRepoModal(false)}
+                className="rounded-md border border-white/10 bg-white/5 p-2 text-[#a8a8a8] hover:bg-white/10 hover:text-white"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="space-y-4 px-4 py-4">
+              <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs leading-5 text-[#aeb7c5]">
+                Workspace aktif: <span className="text-white">{store.nativeProjectPath || 'Belum ada workspace'}</span>
+                {detectedOriginUrl ? (
+                  <div className="mt-1 text-[11px] text-emerald-200">Remote origin saat ini: {detectedOriginUrl}</div>
+                ) : (
+                  <div className="mt-1 text-[11px] text-[#8e97a6]">Belum ada remote origin yang terdeteksi di workspace ini.</div>
+                )}
+              </div>
+              <div>
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8a8a8a]">
+                  Repository URL
+                </div>
+                <input
+                  value={connectRepoUrl}
+                  onChange={(event) => setConnectRepoUrl(event.target.value)}
+                  placeholder="https://github.com/owner/repository.git"
+                  className="h-10 w-full rounded-xl border border-white/10 bg-[#101010] px-3 text-sm text-white outline-none placeholder:text-[#666] focus:border-blue-500/40"
+                />
+              </div>
+              <div>
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8a8a8a]">
+                  Default Branch
+                </div>
+                <input
+                  value={connectRepoBranch}
+                  onChange={(event) => setConnectRepoBranch(event.target.value)}
+                  placeholder="main"
+                  className="h-10 w-full rounded-xl border border-white/10 bg-[#101010] px-3 text-sm text-white outline-none placeholder:text-[#666] focus:border-blue-500/40"
+                />
+              </div>
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs leading-5 text-emerald-100">
+                AURA akan membuat repo Git lokal jika workspace ini belum punya <code>.git</code>, lalu menambahkan atau memperbarui remote <code>origin</code>, membuat commit otomatis, dan langsung push ke GitHub. Jika token GitHub tersimpan di Settings, AURA akan memakainya otomatis.
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-white/5 bg-[#252526] px-4 py-3">
+              <button
+                onClick={() => setShowConnectRepoModal(false)}
+                className="rounded-lg px-4 py-2 text-xs font-semibold text-[#a8a8a8] hover:text-white"
+              >
+                Cancel
+              </button>
+                <button
+                  onClick={() => void handleConnectRepository()}
+                  disabled={!store.nativeProjectPath || !connectRepoUrl.trim() || isConnectingRepo}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+                >
+                {isConnectingRepo ? 'Publishing...' : 'Init, Connect & Push'}
+                </button>
             </div>
           </div>
         </div>

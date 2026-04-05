@@ -156,6 +156,48 @@ const resolveCwdTarget = (currentCwd: string | undefined, rawTarget: string, fal
   return `/${segments.join('/')}`.replace(/\/$/, '') || '/';
 };
 
+const getParentDirectory = (value: string) => {
+  const normalized = normalizePath(value).replace(/\/+$/, '');
+  if (!normalized) return '';
+  const driveRootMatch = normalized.match(/^[A-Za-z]:$/);
+  if (driveRootMatch) {
+    return normalized;
+  }
+
+  const lastSlash = normalized.lastIndexOf('/');
+  if (lastSlash <= 0) {
+    return normalized;
+  }
+
+  const parent = normalized.slice(0, lastSlash);
+  return parent || normalized;
+};
+
+const isSameOrInsidePath = (target: string, parent: string) => {
+  const normalizedTarget = normalizePath(target).replace(/\/+$/, '');
+  const normalizedParent = normalizePath(parent).replace(/\/+$/, '');
+  return normalizedTarget === normalizedParent || normalizedTarget.startsWith(`${normalizedParent}/`);
+};
+
+const findNearestGitRoot = async (startPath: string) => {
+  const { exists } = await import('@tauri-apps/plugin-fs');
+  let current = normalizePath(startPath).replace(/\/+$/, '');
+
+  while (current) {
+    if (await exists(`${current}/.git`)) {
+      return current;
+    }
+
+    const parent = getParentDirectory(current);
+    if (!parent || parent === current) {
+      break;
+    }
+    current = parent;
+  }
+
+  return null;
+};
+
 const handleCdCommand = async (sessionId: string, command: string, appendOutput: AppendOutput) => {
   const { exists, stat } = await import('@tauri-apps/plugin-fs');
   const store = useAppStore.getState();
@@ -330,6 +372,37 @@ export const terminalEngine = {
       const cwd = getSession(sessionId)?.cwd || store.nativeProjectPath || undefined;
       const tokens = tokenizeCommand(val);
       const executable = tokens[0]?.toLowerCase();
+      let executionCwd = cwd;
+
+      if (executable === 'git') {
+        const workspaceRoot = store.nativeProjectPath ? normalizePath(store.nativeProjectPath) : '';
+        const gitSearchRoot = cwd || workspaceRoot;
+
+        if (!gitSearchRoot) {
+          appendOutput('[AURA] Workspace aktif belum tersedia untuk menjalankan perintah Git.', sessionId);
+          return;
+        }
+
+        const gitRoot = await findNearestGitRoot(gitSearchRoot);
+        if (!gitRoot) {
+          appendOutput('[AURA] Folder aktif belum menjadi repo Git. `git status` tidak dijalankan.', sessionId);
+          appendOutput('[AURA] Jika memang ingin repo lokal terpisah, jalankan `git init` di root workspace proyek ini.', sessionId);
+          return;
+        }
+
+        if (workspaceRoot && !isSameOrInsidePath(gitRoot, workspaceRoot)) {
+          appendOutput(`[AURA] Git root terdekat berada di luar workspace aktif: ${gitRoot}`, sessionId);
+          appendOutput('[AURA] Untuk keamanan, AURA membatalkan perintah Git agar tidak membaca repo induk atau home directory.', sessionId);
+          appendOutput(`[AURA] Workspace aktif: ${workspaceRoot}`, sessionId);
+          appendOutput('[AURA] Solusi: buka folder repo yang benar atau buat repo baru khusus di workspace ini dengan `git init`.', sessionId);
+          return;
+        }
+
+        executionCwd = gitRoot;
+        if (gitRoot !== cwd) {
+          appendOutput(`[AURA] Menjalankan Git dari root repo aktif: ${gitRoot}`, sessionId);
+        }
+      }
 
       if (isWindows && executable === 'npm' && cwd) {
         const packageJsonPath = `${cwd.replace(/\/+$/, '')}/package.json`;
@@ -407,7 +480,7 @@ export const terminalEngine = {
 
       for (const strategy of strategies) {
         appendOutput(
-          `[AURA] Exec -> ${strategy.program}${strategy.args.length ? ` ${strategy.args.join(' ')}` : ''}${cwd ? ` | cwd=${cwd}` : ''}`,
+          `[AURA] Exec -> ${strategy.program}${strategy.args.length ? ` ${strategy.args.join(' ')}` : ''}${executionCwd ? ` | cwd=${executionCwd}` : ''}`,
           sessionId
         );
         if (strategy.note) {
@@ -416,7 +489,7 @@ export const terminalEngine = {
 
         try {
           const spawned = Command.create(strategy.program, strategy.args, {
-            cwd,
+            cwd: executionCwd,
             env: {
               FORCE_COLOR: '1'
             }
@@ -449,7 +522,7 @@ export const terminalEngine = {
             window.dispatchEvent(new CustomEvent('aura-terminal-process-closed', {
               detail: {
                 sessionId,
-                cwd,
+                cwd: executionCwd,
                 command: val,
                 code,
                 signal

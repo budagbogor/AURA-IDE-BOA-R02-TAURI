@@ -28,7 +28,7 @@ export const buildCloneTerminalOutput = (repoUrl: string, targetPath: string, ou
 
 export const buildCreateProjectTerminalOutput = (projectRoot: string) => [
   `[AURA] Project created: ${projectRoot}`,
-  '[AURA] Workspace siap. Jalankan perintah terminal atau kirim prompt AI untuk mulai membangun project.'
+  '[AURA] Workspace kosong siap dipakai. Kirim prompt AI untuk generate file sesuai kebutuhan.'
 ];
 
 export const buildStarterProjectFiles = (projectRoot: string, projectName: string) => {
@@ -37,10 +37,11 @@ export const buildStarterProjectFiles = (projectRoot: string, projectName: strin
 
   return {
     srcRoot,
+    initialFilePath: null as string | null,
     filesToWrite: [
       {
         path: `${projectRoot}/package.json`,
-        content: JSON.stringify({
+        content: `${JSON.stringify({
           name: normalizedProjectName.toLowerCase(),
           private: true,
           version: '0.1.0',
@@ -61,7 +62,7 @@ export const buildStarterProjectFiles = (projectRoot: string, projectName: strin
             '@types/react-dom': '^19.0.4',
             '@vitejs/plugin-react': '^5.0.4'
           }
-        }, null, 2)
+        }, null, 2)}\n`
       },
       {
         path: `${projectRoot}/index.html`,
@@ -77,12 +78,13 @@ export const buildStarterProjectFiles = (projectRoot: string, projectName: strin
           '    <div id="root"></div>',
           '    <script type="module" src="/src/main.tsx"></script>',
           '  </body>',
-          '</html>'
+          '</html>',
+          ''
         ].join('\n')
       },
       {
         path: `${projectRoot}/tsconfig.json`,
-        content: JSON.stringify({
+        content: `${JSON.stringify({
           compilerOptions: {
             target: 'ES2020',
             useDefineForClassFields: true,
@@ -95,24 +97,35 @@ export const buildStarterProjectFiles = (projectRoot: string, projectName: strin
             isolatedModules: true,
             noEmit: true,
             jsx: 'react-jsx',
-            strict: true
+            strict: true,
+            baseUrl: '.',
+            paths: {
+              '@/*': ['src/*']
+            }
           },
           include: ['src']
-        }, null, 2)
+        }, null, 2)}\n`
       },
       {
         path: `${projectRoot}/vite.config.ts`,
         content: [
+          "import { fileURLToPath, URL } from 'node:url';",
           "import { defineConfig } from 'vite';",
           "import react from '@vitejs/plugin-react';",
           '',
           'export default defineConfig({',
           '  plugins: [react()],',
+          '  resolve: {',
+          '    alias: {',
+          "      '@': fileURLToPath(new URL('./src', import.meta.url))",
+          '    }',
+          '  },',
           '  server: {',
           "    host: '0.0.0.0',",
           '    port: 3000',
           '  }',
-          '});'
+          '});',
+          ''
         ].join('\n')
       },
       {
@@ -121,82 +134,29 @@ export const buildStarterProjectFiles = (projectRoot: string, projectName: strin
           "import React from 'react';",
           "import ReactDOM from 'react-dom/client';",
           "import App from './App';",
-          "import './style.css';",
+          "import './index.css';",
           '',
           "ReactDOM.createRoot(document.getElementById('root')!).render(",
           '  <React.StrictMode>',
           '    <App />',
           '  </React.StrictMode>',
-          ');'
+          ');',
+          ''
         ].join('\n')
       },
       {
         path: `${srcRoot}/App.tsx`,
         content: [
+          '// AURA_EMPTY_ENTRY',
           'export default function App() {',
-          '  return (',
-          '    <main className="shell">',
-          '      <div className="card">',
-          '        <p className="eyebrow">AURA Starter</p>',
-          `        <h1>${projectName}</h1>`,
-          '        <p>Project baru ini dibuat dari AURA IDE dengan fondasi Vite + React + TypeScript yang bersih.</p>',
-          '      </div>',
-          '    </main>',
-          '  );',
-          '}'
+          '  return null;',
+          '}',
+          ''
         ].join('\n')
       },
       {
-        path: `${srcRoot}/style.css`,
-        content: [
-          ':root {',
-          "  color-scheme: dark;",
-          "  font-family: 'Segoe UI', sans-serif;",
-          "  background: #121212;",
-          "  color: #f3f3f3;",
-          '}',
-          '',
-          'body {',
-          '  margin: 0;',
-          '  min-height: 100vh;',
-          '  background: radial-gradient(circle at top, #1d3557, #121212 58%);',
-          '}',
-          '',
-          '.shell {',
-          '  min-height: 100vh;',
-          '  display: grid;',
-          '  place-items: center;',
-          '  padding: 24px;',
-          '}',
-          '',
-          '.card {',
-          '  width: min(720px, 100%);',
-          '  border: 1px solid rgba(255,255,255,0.08);',
-          '  border-radius: 24px;',
-          '  padding: 32px;',
-          '  background: rgba(18,18,18,0.82);',
-          '  box-shadow: 0 24px 80px rgba(0,0,0,0.35);',
-          '}',
-          '',
-          '.eyebrow {',
-          '  margin: 0 0 12px;',
-          '  text-transform: uppercase;',
-          '  letter-spacing: 0.18em;',
-          '  color: #7cc6ff;',
-          '  font-size: 12px;',
-          '}',
-          '',
-          'h1 {',
-          '  margin: 0 0 16px;',
-          '  font-size: clamp(36px, 6vw, 64px);',
-          '}',
-          '',
-          'p {',
-          '  margin: 0;',
-          '  line-height: 1.7;',
-          '  color: #cfd6df;',
-          '}'
-        ].join('\n')
+        path: `${srcRoot}/index.css`,
+        content: ''
       }
     ]
   };

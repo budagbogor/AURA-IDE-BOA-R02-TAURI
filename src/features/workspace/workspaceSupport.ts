@@ -387,6 +387,7 @@ export const buildDeveloperPromptPrefix = (taskPresetId: string, selectedSkill: 
     '- Prioritaskan solusi yang benar-benar bisa dijalankan, bukan pseudo-code.',
     '- Jika membuat atau mengubah file, gunakan path file yang jelas.',
     '- Untuk UI/UX, hasil harus responsif, rapi, dan siap dipakai di project nyata.',
+    '- Untuk mobile app, gunakan pola Capacitor + React yang mobile-first dengan navigation dan touch target yang masuk akal.',
     '- Untuk bugfix, jelaskan akar masalah secara singkat lalu berikan patch final.',
     '- Untuk refactor/fullstack, jaga struktur file dan dependency tetap konsisten.'
   ].join('\n');
@@ -412,12 +413,69 @@ export const detectWorkDomains = (prompt: string, activeFile: FileItem | null, f
   const source = `${prompt}\n${activeFile?.path || activeFile?.name || ''}\n${files.map((file) => file.path || file.name).join('\n')}`.toLowerCase();
 
   if (/src\/|component|tsx|jsx|css|tailwind|responsive|layout|ui|ux|frontend|page|react/.test(source)) signals.add('frontend');
+  if (/mobile|android|ios|apk|capacitor|native shell|tab bar|bottom nav|safe-area|touch target/.test(source)) signals.add('mobile');
   if (/api|server|backend|route|controller|service|schema|database|sql|auth|endpoint/.test(source)) signals.add('backend');
   if (/tauri|src-tauri|rust|invoke|plugin-shell|plugin-fs|desktop/.test(source)) signals.add('tauri');
   if (/security|auth|token|secret|sanitize|escape|permission|owasp|csrf|xss/.test(source)) signals.add('security');
   if (/design system|token|typography|spacing|component library|theme|a11y|accessibility/.test(source)) signals.add('design-system');
   if (signals.size === 0) signals.add('frontend');
   return Array.from(signals);
+};
+
+export const isUiFirstPrompt = (prompt: string) =>
+  /(landing page|homepage|home page|company profile|profile company|dashboard|website|web app|app web|toko|shop|storefront|commerce|portfolio|marketing page|saas ui|ui redesign|desain ui|ui ux|frontend ui|tailwind)/i.test(prompt);
+
+export const isWeakFrontendOutput = (
+  generatedFiles: AiGeneratedFile[],
+  userPrompt = ''
+) => {
+  const appLikeFiles = generatedFiles.filter((file) => /src\/App\.tsx|src\/main\.tsx|src\/components\/|src\/pages\/|src\/index\.css|index\.html/i.test(file.relativePath));
+  const classSignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/className=|class=/g);
+    return total + (matches?.length || 0);
+  }, 0);
+  const sectionSignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/<section\b|hero|testimonial|feature|service|cta|footer|navbar/gi);
+    return total + (matches?.length || 0);
+  }, 0);
+  const utilitySignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/(?:bg-|text-|px-|py-|grid|flex|rounded|shadow|max-w-|min-h-|gap-)/g);
+    return total + (matches?.length || 0);
+  }, 0);
+  const emptyLinkSignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/(?:href|to)=["'](?:#|#\s*|javascript:void\(0\)|)["']/gi);
+    return total + (matches?.length || 0);
+  }, 0);
+  const meaningfulLinkSignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/(?:href|to)=["'](?:#[a-z0-9-]{2,}|\/[a-z0-9/_-]+|https?:\/\/|mailto:|tel:|https:\/\/wa\.me\/)[^"']*["']/gi);
+    return total + (matches?.length || 0);
+  }, 0);
+  const imageSignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/<img\b|backgroundImage=|src=["'][^"']+\.(?:png|jpe?g|webp|svg|gif)|from ['"][^'"]+\.(?:png|jpe?g|webp|svg|gif)|\/images\/|src\/assets\/|unsplash|pexels|placehold|data:image\/|<svg\b/gi);
+    return total + (matches?.length || 0);
+  }, 0);
+  const mockDataSignalCount = generatedFiles.reduce((total, file) => {
+    const matches = file.content.match(/\b(?:const|export const)\s+(?:navItems|links|services|features|products|testimonials|faqs|faqItems|team|teamMembers|pricing|stats|contacts?|gallery|portfolio|projects)\s*=\s*\[|\.map\(\s*\(|rating|price|location|quote|role|label/gi);
+    return total + (matches?.length || 0);
+  }, 0);
+  const hasEntrypoint = generatedFiles.some((file) => /src\/App\.tsx|src\/main\.tsx|index\.html/i.test(file.relativePath));
+  const uiFirst = isUiFirstPrompt(userPrompt);
+  const realismPrompt =
+    /(landing page|landingpage|website|homepage|dashboard|toko|store|commerce|catalog|katalog|bengkel|company profile|profil perusahaan|saas|app|aplikasi)/i.test(
+      userPrompt
+    );
+
+  if (!uiFirst) return false;
+  if (!hasEntrypoint) return true;
+  if (appLikeFiles.length < 4) return true;
+  if (classSignalCount < 12) return true;
+  if (utilitySignalCount < 24) return true;
+  if (sectionSignalCount < 6) return true;
+  if (realismPrompt && emptyLinkSignalCount > 0) return true;
+  if (realismPrompt && meaningfulLinkSignalCount < 2) return true;
+  if (realismPrompt && imageSignalCount < 1) return true;
+  if (realismPrompt && mockDataSignalCount < 3) return true;
+  return false;
 };
 
 export const getRelativeFilePath = (filePath: string, rootPath?: string | null) => {
@@ -448,6 +506,7 @@ export const inferPreferredWorkspaceTargets = (
 
   const domainFolders: Record<string, string[]> = {
     frontend: ['src/components', 'src/pages', 'src/app', 'src/routes', 'src', 'components', 'pages', 'client/src/components', 'client/src'],
+    mobile: ['src/screens', 'src/pages', 'src/components', 'src/mobile', 'src/lib', 'src/data', 'src'],
     backend: ['src/api', 'src/server', 'src/services', 'src/lib', 'server', 'api', 'backend', 'client/src/api', 'src'],
     tauri: ['src-tauri/src', 'src-tauri/capabilities', 'src-tauri'],
     security: ['src/server', 'src/api', 'src/lib', 'server', 'api', 'src-tauri/src'],
@@ -929,8 +988,114 @@ export const collectParentFolderPaths = (absolutePath: string, rootPath?: string
 };
 
 const SCRIPT_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx']);
+const ROOT_LEVEL_CONFIG_NAMES = new Set([
+  'postcss.config.js',
+  'postcss.config.cjs',
+  'postcss.config.mjs',
+  'tailwind.config.js',
+  'tailwind.config.cjs',
+  'tailwind.config.mjs',
+  'tailwind.config.ts',
+  'capacitor.config.ts'
+]);
+const NODE_BUILTIN_IMPORTS = new Set([
+  'fs', 'path', 'os', 'url', 'node:fs', 'node:path', 'node:os', 'node:url', 'process'
+]);
+const TAILWIND_UTILITY_SIGNAL = /\b(className|class)\s*=\s*["'{`][^"'`]*(?:flex|grid|px-|py-|mx-|my-|gap-|bg-|text-|rounded|shadow|items-|justify-|min-h-|max-w-|w-|h-)/i;
+const KNOWN_RUNTIME_DEPENDENCIES: Record<string, string> = {
+  clsx: '^2.1.1',
+  'lucide-react': '^0.542.0',
+  '@iconify/react': '^5.0.1',
+  'react-router-dom': '^7.8.0',
+  'class-variance-authority': '^0.7.1',
+  'tailwind-merge': '^2.5.2',
+  '@capacitor/core': '^8.2.0',
+  '@radix-ui/react-slot': '^1.1.0'
+};
+const KNOWN_DEV_DEPENDENCIES: Record<string, string> = {
+  tailwindcss: '^4.1.13',
+  '@tailwindcss/vite': '^4.1.13',
+  '@tailwindcss/postcss': '^4.1.13',
+  postcss: '^8.4.49',
+  autoprefixer: '^10.4.20',
+  '@capacitor/cli': '^8.2.0',
+  '@capacitor/android': '^8.2.0'
+};
+const WEB_PRODUCTION_ROOT_FILES = new Set([
+  'package.json',
+  'index.html',
+  'tsconfig.json',
+  'vite.config.ts',
+  'vite.config.js',
+  'vite.config.mjs',
+  'postcss.config.js',
+  'postcss.config.cjs',
+  'postcss.config.mjs',
+  'tailwind.config.js',
+  'tailwind.config.cjs',
+  'tailwind.config.mjs',
+  'tailwind.config.ts'
+]);
+const MOBILE_PRODUCTION_ROOT_FILES = new Set([
+  ...WEB_PRODUCTION_ROOT_FILES,
+  'capacitor.config.ts'
+]);
+const WEB_PRODUCTION_ALLOWED_PREFIXES = [
+  'src/App.',
+  'src/main.',
+  'src/index.css',
+  'src/components/',
+  'src/pages/',
+  'src/lib/',
+  'src/data/',
+  'src/assets/',
+  'src/hooks/',
+  'src/types/',
+  'src/utils/'
+];
+const MOBILE_PRODUCTION_ALLOWED_PREFIXES = [
+  ...WEB_PRODUCTION_ALLOWED_PREFIXES,
+  'src/screens/',
+  'src/mobile/'
+];
 
 const getExtension = (filePath: string) => filePath.split('.').pop()?.toLowerCase() || '';
+const getBaseName = (filePath: string) => normalizePath(filePath).split('/').pop()?.toLowerCase() || '';
+const buildDefaultFrontendTsConfig = () => `${JSON.stringify({
+  compilerOptions: {
+    target: 'ES2020',
+    useDefineForClassFields: true,
+    lib: ['ES2020', 'DOM', 'DOM.Iterable'],
+    module: 'ESNext',
+    skipLibCheck: true,
+    moduleResolution: 'Bundler',
+    allowImportingTsExtensions: false,
+    resolveJsonModule: true,
+    isolatedModules: true,
+    noEmit: true,
+    jsx: 'react-jsx',
+    strict: true,
+    baseUrl: '.',
+    paths: {
+      '@/*': ['src/*']
+    }
+  },
+  include: ['src']
+}, null, 2)}\n`;
+const isWebProductionAllowedPath = (relativePath: string) => {
+  const normalized = normalizePath(relativePath).replace(/^\/+/, '');
+  if (WEB_PRODUCTION_ROOT_FILES.has(normalized)) return true;
+  return WEB_PRODUCTION_ALLOWED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+};
+const isMobileProductionAllowedPath = (relativePath: string) => {
+  const normalized = normalizePath(relativePath).replace(/^\/+/, '');
+  if (MOBILE_PRODUCTION_ROOT_FILES.has(normalized)) return true;
+  return MOBILE_PRODUCTION_ALLOWED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+};
+const isBackendOrDesktopRelativePath = (relativePath: string) =>
+  /^(api\/|backend\/|server\/|src\/server\/|src\/api\/|src-tauri\/)/i.test(normalizePath(relativePath).replace(/^\/+/, ''));
+const isMobileRelativePath = (relativePath: string) =>
+  /^(capacitor\.config\.ts|src\/screens\/|src\/mobile\/)/i.test(normalizePath(relativePath).replace(/^\/+/, ''));
 
 const getFileDirectory = (relativePath: string) => {
   const normalized = normalizePath(relativePath);
@@ -972,6 +1137,704 @@ const buildRelativeImportPath = (fromRelativePath: string, toRelativePath: strin
 };
 
 const stripKnownScriptExtension = (value: string) => value.replace(/\.(tsx|ts|jsx|js)$/i, '');
+
+const normalizeGeneratedRelativePath = (relativePath: string) => {
+  const normalized = normalizePath(relativePath).replace(/^\/+/, '');
+  const baseName = getBaseName(normalized);
+
+  if (ROOT_LEVEL_CONFIG_NAMES.has(baseName)) {
+    return baseName;
+  }
+
+  return normalized;
+};
+
+const sanitizeGeneratedCodeContent = (content: string) => {
+  const trimmedContent = content.replace(/\s+$/, '');
+  if (!trimmedContent.trim()) return trimmedContent;
+
+  const lines = trimmedContent.split('\n');
+  const diffSignalCount = lines.filter((line) => {
+    const trimmed = line.trim();
+    return (
+      trimmed.startsWith('diff --git') ||
+      trimmed.startsWith('index ') ||
+      trimmed.startsWith('@@') ||
+      trimmed.startsWith('+++') ||
+      trimmed.startsWith('---') ||
+      (/^[+-](?!\s*$)/.test(trimmed) && !/^[+-]{3}/.test(trimmed))
+    );
+  }).length;
+
+  const shouldStripPatchArtifacts =
+    diffSignalCount >= 2 ||
+    lines.some((line) => /^[+-](import|export|const |let |var |function |class |type |interface )/.test(line.trim()));
+
+  if (!shouldStripPatchArtifacts) {
+    return trimmedContent;
+  }
+
+  const sanitizedLines = lines
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return true;
+      return !(
+        trimmed.startsWith('diff --git') ||
+        trimmed.startsWith('index ') ||
+        trimmed.startsWith('@@') ||
+        trimmed.startsWith('+++') ||
+        trimmed.startsWith('---')
+      );
+    })
+    .map((line) => {
+      if (/^\+(?!\+\+)/.test(line)) {
+        return line.slice(1);
+      }
+      if (/^-(?!-)/.test(line)) {
+        return '';
+      }
+      return line;
+    });
+
+  return sanitizedLines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+};
+
+const isAcceptableGeneratedPath = (relativePath: string) => {
+  const normalized = normalizeGeneratedRelativePath(relativePath);
+  const baseName = getBaseName(normalized);
+  const extension = getExtension(normalized);
+
+  if (!normalized) return false;
+  if (ROOT_LEVEL_CONFIG_NAMES.has(baseName)) return true;
+  if (baseName === 'package.json' || baseName === 'index.html') return true;
+  if (/\/(?:package\.json|index\.html|vite\.config\.(?:ts|js|mjs|cjs))$/i.test(normalized)) return true;
+  if (SCRIPT_EXTENSIONS.has(extension) || ['css', 'scss', 'sass', 'less', 'html', 'json'].includes(extension)) return true;
+  return false;
+};
+
+const normalizePackageImportName = (importSource: string) => {
+  if (!importSource || importSource.startsWith('.') || importSource.startsWith('/')) return '';
+  if (importSource.startsWith('@/') || importSource === '@') return '';
+  if (importSource.startsWith('~/') || importSource === '~') return '';
+  if (NODE_BUILTIN_IMPORTS.has(importSource) || importSource.startsWith('node:')) return '';
+  if (importSource.startsWith('@')) {
+    const [scope, pkg] = importSource.split('/');
+    return scope && pkg ? `${scope}/${pkg}` : importSource;
+  }
+  return importSource.split('/')[0];
+};
+
+const collectGeneratedPackageRequirements = (generatedFiles: AiGeneratedFile[]) => {
+  const runtimeDeps = new Set<string>();
+  const devDeps = new Set<string>();
+
+  generatedFiles.forEach((file) => {
+    const relativePath = normalizePath(file.relativePath);
+    const baseName = getBaseName(relativePath);
+    const isScriptFile = SCRIPT_EXTENSIONS.has(getExtension(relativePath));
+
+    if (ROOT_LEVEL_CONFIG_NAMES.has(baseName)) {
+      devDeps.add('tailwindcss');
+      devDeps.add('@tailwindcss/vite');
+      devDeps.add('@tailwindcss/postcss');
+      devDeps.add('postcss');
+      devDeps.add('autoprefixer');
+      if (baseName === 'capacitor.config.ts') {
+        runtimeDeps.add('@capacitor/core');
+        devDeps.add('@capacitor/cli');
+        devDeps.add('@capacitor/android');
+      }
+    }
+
+    if (/@tailwind|tailwindcss/i.test(file.content) || TAILWIND_UTILITY_SIGNAL.test(file.content)) {
+      devDeps.add('tailwindcss');
+      devDeps.add('@tailwindcss/vite');
+      devDeps.add('@tailwindcss/postcss');
+      devDeps.add('postcss');
+      devDeps.add('autoprefixer');
+    }
+
+    if (isScriptFile) {
+      const importMatches = Array.from(file.content.matchAll(/(?:import|export)\s+[^'"]*?from\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g));
+      importMatches.forEach((match) => {
+        const source = normalizePackageImportName(match[1] || match[2] || '');
+        if (!source) return;
+        runtimeDeps.add(source);
+      });
+
+      if (/capacitor|statusbar|splashscreen|keyboard|haptics|applaunch|safe-area/i.test(file.content) || /mobile|android|ios/i.test(relativePath)) {
+        runtimeDeps.add('@capacitor/core');
+        devDeps.add('@capacitor/cli');
+        devDeps.add('@capacitor/android');
+      }
+    }
+  });
+
+  runtimeDeps.delete('react');
+  runtimeDeps.delete('react-dom');
+  runtimeDeps.delete('@vitejs/plugin-react');
+
+  return { runtimeDeps, devDeps };
+};
+
+const ensureTailwindEntrypoints = (
+  generatedFiles: AiGeneratedFile[],
+  workspaceFiles: FileItem[] = [],
+  rootPath?: string | null
+) => {
+  const normalizedRoot = rootPath ? normalizePath(rootPath) : '';
+  const usesTailwindUtilities = generatedFiles.some((file) => TAILWIND_UTILITY_SIGNAL.test(file.content));
+
+  if (!usesTailwindUtilities) {
+    return generatedFiles;
+  }
+
+  const ensureFile = (relativePath: string, contentFactory: (existing?: string) => string) => {
+    const normalizedRelativePath = normalizePath(relativePath);
+    const absolutePath = normalizedRoot ? normalizePath(`${normalizedRoot}/${normalizedRelativePath}`) : normalizedRelativePath;
+    const generated = generatedFiles.find((file) => normalizePath(file.relativePath) === normalizedRelativePath);
+    const workspace = workspaceFiles.find((file) => normalizePath(getRelativeFilePath(file.path || file.id, normalizedRoot)) === normalizedRelativePath);
+    const nextContent = contentFactory(generated?.content || workspace?.content);
+
+    if (generated) {
+      generated.content = nextContent;
+      return;
+    }
+
+    generatedFiles.push({
+      absolutePath,
+      relativePath: normalizedRelativePath,
+      name: normalizedRelativePath.split('/').pop() || normalizedRelativePath,
+      content: nextContent,
+      language: getLanguageByExtension(normalizedRelativePath)
+    });
+  };
+
+  const buildDefaultTailwindIndexCss = () => [
+    '@import "tailwindcss";',
+    '',
+    '@theme {',
+    '  --font-sans: "Inter", "Segoe UI", sans-serif;',
+    '  --color-background: #020617;',
+    '  --color-foreground: #f8fafc;',
+    '  --color-card: #0f172a;',
+    '  --color-card-foreground: #f8fafc;',
+    '  --color-popover: #0f172a;',
+    '  --color-popover-foreground: #f8fafc;',
+    '  --color-primary: #2563eb;',
+    '  --color-primary-foreground: #eff6ff;',
+    '  --color-secondary: #e2e8f0;',
+    '  --color-secondary-foreground: #0f172a;',
+    '  --color-muted: #1e293b;',
+    '  --color-muted-foreground: #94a3b8;',
+    '  --color-accent: #1d4ed8;',
+    '  --color-accent-foreground: #eff6ff;',
+    '  --color-border: #cbd5e1;',
+    '  --color-input: #cbd5e1;',
+    '  --color-ring: #60a5fa;',
+    '  --color-primary-dark: #0f172a;',
+    '  --color-secondary-light: #f8fafc;',
+    '  --color-accent-primary: #2563eb;',
+    '  --color-accent-secondary: #1d4ed8;',
+    '  --color-gray-muted: #64748b;',
+    '  --color-border-color: #cbd5e1;',
+    '  --shadow-card: 0 18px 45px rgba(15, 23, 42, 0.10);',
+    '  --shadow-soft: 0 24px 70px rgba(15, 23, 42, 0.18);',
+    '  --animate-slideUp: slideUp 0.7s ease-out both;',
+    '}',
+    '',
+    '@utility bg-background { background-color: var(--color-background); }',
+    '@utility text-foreground { color: var(--color-foreground); }',
+    '@utility bg-card { background-color: var(--color-card); }',
+    '@utility text-card-foreground { color: var(--color-card-foreground); }',
+    '@utility bg-popover { background-color: var(--color-popover); }',
+    '@utility text-popover-foreground { color: var(--color-popover-foreground); }',
+    '@utility bg-primary { background-color: var(--color-primary); }',
+    '@utility text-primary { color: var(--color-primary); }',
+    '@utility text-primary-foreground { color: var(--color-primary-foreground); }',
+    '@utility bg-secondary { background-color: var(--color-secondary); }',
+    '@utility text-secondary { color: var(--color-secondary); }',
+    '@utility text-secondary-foreground { color: var(--color-secondary-foreground); }',
+    '@utility bg-muted { background-color: var(--color-muted); }',
+    '@utility text-muted { color: var(--color-muted); }',
+    '@utility text-muted-foreground { color: var(--color-muted-foreground); }',
+    '@utility bg-accent { background-color: var(--color-accent); }',
+    '@utility text-accent { color: var(--color-accent); }',
+    '@utility text-accent-foreground { color: var(--color-accent-foreground); }',
+    '@utility border-border { border-color: var(--color-border); }',
+    '@utility border-input { border-color: var(--color-input); }',
+    '@utility ring-ring { --tw-ring-color: var(--color-ring); }',
+    '',
+    '@keyframes slideUp {',
+    '  from {',
+    '    opacity: 0;',
+    '    transform: translateY(18px);',
+    '  }',
+    '  to {',
+    '    opacity: 1;',
+    '    transform: translateY(0);',
+    '  }',
+    '}',
+    '',
+    '@layer base {',
+    '  html {',
+    '    scroll-behavior: smooth;',
+    '  }',
+    '',
+    '  body {',
+    '    @apply bg-slate-950 text-slate-100 antialiased;',
+    '  }',
+    '}',
+    ''
+  ].join('\n');
+
+  const buildDefaultMainEntrypoint = () =>
+    "import './index.css';\nimport React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n);\n";
+
+  const buildDefaultPostCssConfig = () =>
+    [
+      'export default {',
+      '  plugins: {',
+      '    "@tailwindcss/postcss": {},',
+      '    autoprefixer: {},',
+      '  },',
+      '};',
+      ''
+    ].join('\n');
+
+  const normalizeThemeReferences = (value: string) =>
+    value
+      .replace(/theme\(['"]colors\.background['"]\)/gi, 'var(--color-background)')
+      .replace(/theme\(['"]colors\.foreground['"]\)/gi, 'var(--color-foreground)')
+      .replace(/theme\(['"]colors\.card['"]\)/gi, 'var(--color-card)')
+      .replace(/theme\(['"]colors\.card-foreground['"]\)/gi, 'var(--color-card-foreground)')
+      .replace(/theme\(['"]colors\.primary['"]\)/gi, 'var(--color-primary)')
+      .replace(/theme\(['"]colors\.primary-foreground['"]\)/gi, 'var(--color-primary-foreground)')
+      .replace(/theme\(['"]colors\.secondary['"]\)/gi, 'var(--color-secondary)')
+      .replace(/theme\(['"]colors\.secondary-foreground['"]\)/gi, 'var(--color-secondary-foreground)')
+      .replace(/theme\(['"]colors\.muted['"]\)/gi, 'var(--color-muted)')
+      .replace(/theme\(['"]colors\.muted-foreground['"]\)/gi, 'var(--color-muted-foreground)')
+      .replace(/theme\(['"]colors\.accent['"]\)/gi, 'var(--color-accent)')
+      .replace(/theme\(['"]colors\.accent-foreground['"]\)/gi, 'var(--color-accent-foreground)')
+      .replace(/theme\(['"]colors\.border['"]\)/gi, 'var(--color-border)')
+      .replace(/theme\(['"]colors\.input['"]\)/gi, 'var(--color-input)')
+      .replace(/theme\(['"]colors\.ring['"]\)/gi, 'var(--color-ring)')
+      .replace(/theme\(['"]colors\.secondary-light['"]\)/gi, 'var(--color-secondary-light)')
+      .replace(/theme\(['"]colors\.primary-dark['"]\)/gi, 'var(--color-primary-dark)')
+      .replace(/theme\(['"]colors\.accent-primary['"]\)/gi, 'var(--color-accent-primary)')
+      .replace(/theme\(['"]colors\.accent-secondary['"]\)/gi, 'var(--color-accent-secondary)')
+      .replace(/theme\(['"]colors\.gray-muted['"]\)/gi, 'var(--color-gray-muted)')
+      .replace(/theme\(['"]colors\.border-color['"]\)/gi, 'var(--color-border-color)');
+
+  ensureFile('src/index.css', (existing) => {
+    if (existing && /\bimport\s+['"]\.\/index\.css['"]|ReactDOM\.createRoot|from\s+['"]react['"]/i.test(existing)) {
+      return buildDefaultTailwindIndexCss();
+    }
+
+    if (existing && /@import\s+["']tailwindcss["'];/i.test(existing)) {
+      return normalizeThemeReferences(existing);
+    }
+
+    const base = buildDefaultTailwindIndexCss();
+
+    if (!existing?.trim()) {
+      return base;
+    }
+
+    const sanitizedExisting = normalizeThemeReferences(
+      existing
+        .replace(/@tailwind\s+base;\s*/gi, '')
+        .replace(/@tailwind\s+components;\s*/gi, '')
+        .replace(/@tailwind\s+utilities;\s*/gi, '')
+        .replace(/@apply\s+border-border\s*;/gi, 'border-color: var(--color-border);')
+        .replace(/@apply\s+bg-background\s*;/gi, 'background-color: var(--color-background);')
+        .replace(/@apply\s+text-foreground\s*;/gi, 'color: var(--color-foreground);')
+        .replace(/@apply\s+bg-card\s*;/gi, 'background-color: var(--color-card);')
+        .replace(/@apply\s+text-card-foreground\s*;/gi, 'color: var(--color-card-foreground);')
+        .trim()
+    );
+
+    return `${base}\n${sanitizedExisting}\n`;
+  });
+
+  ensureFile('src/main.tsx', (existing) => {
+    if (existing && /@tailwind\s+base;|@tailwind\s+components;|@tailwind\s+utilities;|@layer\s+base\b/i.test(existing)) {
+      return buildDefaultMainEntrypoint();
+    }
+
+    if (!existing?.trim()) {
+      return buildDefaultMainEntrypoint();
+    }
+
+    const withoutLegacyStarterCss = existing.replace(/^\s*import\s+['"]\.\/style\.css['"];?\s*$/gim, '').trim();
+
+    if (/import\s+['"]\.\/index\.css['"];?/i.test(withoutLegacyStarterCss)) {
+      return `${withoutLegacyStarterCss}\n`;
+    }
+
+    return `import './index.css';\n${withoutLegacyStarterCss}\n`;
+  });
+
+  ensureFile('vite.config.ts', (existing) => {
+    const baseline = [
+      "import { fileURLToPath, URL } from 'node:url';",
+      "import tailwindcss from '@tailwindcss/vite';",
+      "import react from '@vitejs/plugin-react';",
+      "import { defineConfig } from 'vite';",
+      '',
+      'export default defineConfig({',
+      '  plugins: [react(), tailwindcss()],',
+      '  resolve: {',
+      '    alias: {',
+      "      '@': fileURLToPath(new URL('./src', import.meta.url))",
+      '    }',
+      '  },',
+      '});',
+      ''
+    ].join('\n');
+
+    if (!existing?.trim()) {
+      return baseline;
+    }
+
+    if (/@tailwindcss\/vite|tailwindcss\(\)/i.test(existing)) {
+      let normalized = existing;
+      if (!/fileURLToPath|new URL\('\.\/src', import\.meta\.url\)/i.test(normalized)) {
+        normalized = normalized.includes("import { fileURLToPath, URL } from 'node:url';")
+          ? normalized
+          : `import { fileURLToPath, URL } from 'node:url';\n${normalized}`;
+      }
+      if (!/alias\s*:\s*\{[\s\S]*['"]@['"]\s*:/i.test(normalized)) {
+        if (/resolve\s*:\s*\{/i.test(normalized)) {
+          normalized = normalized.replace(
+            /resolve\s*:\s*\{/i,
+            "resolve: {\n    alias: {\n      '@': fileURLToPath(new URL('./src', import.meta.url))\n    },"
+          );
+        } else if (/defineConfig\s*\(\s*\{/i.test(normalized)) {
+          normalized = normalized.replace(
+            /defineConfig\s*\(\s*\{/i,
+            "defineConfig({\n  resolve: {\n    alias: {\n      '@': fileURLToPath(new URL('./src', import.meta.url))\n    }\n  },"
+          );
+        }
+      }
+      return normalized;
+    }
+
+    const withImport = existing.includes("import tailwindcss from '@tailwindcss/vite';")
+      ? existing
+      : `import tailwindcss from '@tailwindcss/vite';\n${existing}`;
+
+    if (/plugins\s*:\s*\[/i.test(withImport)) {
+      return withImport.replace(/plugins\s*:\s*\[/i, 'plugins: [tailwindcss(), ');
+    }
+
+    return baseline;
+  });
+
+  ensureFile('postcss.config.js', (existing) => {
+    if (existing && /(?:tailwindcss\s*:|require\(['"]tailwindcss['"]\)|from\s+['"]tailwindcss['"]|plugins\s*:\s*\[[^\]]*tailwindcss)/i.test(existing)) {
+      return buildDefaultPostCssConfig();
+    }
+
+    if (existing && /@tailwindcss\/postcss|autoprefixer/i.test(existing)) {
+      return existing;
+    }
+
+    return buildDefaultPostCssConfig();
+  });
+
+  ensureFile('tsconfig.json', (existing) => {
+    if (!existing?.trim()) {
+      return buildDefaultFrontendTsConfig();
+    }
+
+    try {
+      const parsed = JSON.parse(existing);
+      const compilerOptions = parsed.compilerOptions || {};
+      const paths = compilerOptions.paths || {};
+      return `${JSON.stringify({
+        ...parsed,
+        compilerOptions: {
+          ...compilerOptions,
+          baseUrl: compilerOptions.baseUrl || '.',
+          paths: {
+            ...paths,
+            '@/*': Array.isArray(paths['@/*']) && paths['@/*'].length > 0 ? paths['@/*'] : ['src/*']
+          }
+        }
+      }, null, 2)}\n`;
+    } catch {
+      return buildDefaultFrontendTsConfig();
+    }
+  });
+
+  return generatedFiles;
+};
+
+const ensureGeneratedPackageManifest = (
+  generatedFiles: AiGeneratedFile[],
+  workspaceFiles: FileItem[] = [],
+  rootPath?: string | null
+) => {
+  const normalizedRoot = rootPath ? normalizePath(rootPath) : '';
+  const packageRelativePath = 'package.json';
+  const packageAbsolutePath = normalizedRoot ? normalizePath(`${normalizedRoot}/${packageRelativePath}`) : packageRelativePath;
+  const generatedPackage = generatedFiles.find((file) => normalizePath(file.relativePath) === packageRelativePath);
+  const workspacePackage = workspaceFiles.find((file) => normalizePath(getRelativeFilePath(file.path || file.id, normalizedRoot)) === packageRelativePath);
+
+  if (!generatedPackage && !workspacePackage) {
+    return generatedFiles;
+  }
+
+  let manifest: Record<string, any> = {};
+  let workspaceManifest: Record<string, any> = {};
+
+  try {
+    manifest = JSON.parse(workspacePackage?.content || generatedPackage?.content || '{}');
+  } catch {
+    manifest = {};
+  }
+
+  try {
+    workspaceManifest = JSON.parse(workspacePackage?.content || '{}');
+  } catch {
+    workspaceManifest = {};
+  }
+
+  const existingDependencies = { ...(manifest.dependencies || {}) };
+  const existingDevDependencies = { ...(manifest.devDependencies || {}) };
+  const { runtimeDeps, devDeps } = collectGeneratedPackageRequirements(generatedFiles);
+
+  runtimeDeps.forEach((dependency) => {
+    if (KNOWN_RUNTIME_DEPENDENCIES[dependency]) {
+      delete existingDevDependencies[dependency];
+      existingDependencies[dependency] = KNOWN_RUNTIME_DEPENDENCIES[dependency];
+      return;
+    }
+    if (existingDependencies[dependency] || existingDevDependencies[dependency]) return;
+    existingDependencies[dependency] = 'latest';
+  });
+
+  devDeps.forEach((dependency) => {
+    if (KNOWN_DEV_DEPENDENCIES[dependency]) {
+      delete existingDependencies[dependency];
+      existingDevDependencies[dependency] = KNOWN_DEV_DEPENDENCIES[dependency];
+      return;
+    }
+    if (existingDependencies[dependency] || existingDevDependencies[dependency]) return;
+    existingDevDependencies[dependency] = 'latest';
+  });
+
+  const nextManifest = {
+    ...workspaceManifest,
+    ...manifest,
+    name: manifest.name || workspaceManifest.name,
+    version: manifest.version || workspaceManifest.version,
+    private: typeof workspaceManifest.private === 'boolean' ? workspaceManifest.private : manifest.private,
+    type: manifest.type || workspaceManifest.type,
+    scripts: {
+      ...(workspaceManifest.scripts || {}),
+      ...(manifest.scripts || {})
+    },
+    dependencies: Object.keys(existingDependencies).length > 0 ? existingDependencies : undefined,
+    devDependencies: Object.keys(existingDevDependencies).length > 0 ? existingDevDependencies : undefined
+  };
+
+  const nextPackageContent = `${JSON.stringify(nextManifest, null, 2)}\n`;
+
+  if (generatedPackage) {
+    generatedPackage.content = nextPackageContent;
+    return generatedFiles;
+  }
+
+  return [
+    ...generatedFiles,
+    {
+      absolutePath: packageAbsolutePath,
+      relativePath: packageRelativePath,
+      name: 'package.json',
+      content: nextPackageContent,
+      language: 'json'
+    }
+  ];
+};
+
+const ensureDeterministicFrontendScaffold = (
+  generatedFiles: AiGeneratedFile[],
+  workspaceFiles: FileItem[] = [],
+  rootPath?: string | null
+) => {
+  const normalizedRoot = rootPath ? normalizePath(rootPath) : '';
+  const frontendSignal = generatedFiles.some((file) =>
+    /^src\/(App\.tsx|main\.tsx|components\/|pages\/|index\.css)$/i.test(normalizePath(file.relativePath))
+  );
+
+  if (!frontendSignal) {
+    return generatedFiles;
+  }
+
+  const getWorkspaceContent = (relativePath: string) =>
+    workspaceFiles.find((file) =>
+      normalizePath(getRelativeFilePath(file.path || file.id, normalizedRoot)) === normalizePath(relativePath)
+    )?.content;
+
+  const upsertFile = (relativePath: string, content: string, language?: string) => {
+    const normalizedRelativePath = normalizePath(relativePath);
+    const absolutePath = normalizedRoot ? normalizePath(`${normalizedRoot}/${normalizedRelativePath}`) : normalizedRelativePath;
+    const existing = generatedFiles.find((file) => normalizePath(file.relativePath) === normalizedRelativePath);
+    if (existing) {
+      existing.content = content;
+      return;
+    }
+    generatedFiles.push({
+      absolutePath,
+      relativePath: normalizedRelativePath,
+      name: normalizedRelativePath.split('/').pop() || normalizedRelativePath,
+      content,
+      language: language || getLanguageByExtension(normalizedRelativePath)
+    });
+  };
+
+  const defaultIndexHtml = [
+    '<!doctype html>',
+    '<html lang="en">',
+    '  <head>',
+    '    <meta charset="UTF-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    '    <title>AURA App</title>',
+    '  </head>',
+    '  <body>',
+    '    <div id="root"></div>',
+    '    <script type="module" src="/src/main.tsx"></script>',
+    '  </body>',
+    '</html>',
+    ''
+  ].join('\n');
+
+  const defaultMainTsx = [
+    "import './index.css';",
+    "import React from 'react';",
+    "import ReactDOM from 'react-dom/client';",
+    "import App from './App';",
+    '',
+    "ReactDOM.createRoot(document.getElementById('root')!).render(",
+    '  <React.StrictMode>',
+    '    <App />',
+    '  </React.StrictMode>',
+    ');',
+    ''
+  ].join('\n');
+
+  const defaultViteConfig = [
+    "import { fileURLToPath, URL } from 'node:url';",
+    "import tailwindcss from '@tailwindcss/vite';",
+    "import react from '@vitejs/plugin-react';",
+    "import { defineConfig } from 'vite';",
+    '',
+    'export default defineConfig({',
+    '  plugins: [react(), tailwindcss()],',
+    '  resolve: {',
+    '    alias: {',
+    "      '@': fileURLToPath(new URL('./src', import.meta.url))",
+    '    }',
+    '  },',
+    '});',
+    ''
+  ].join('\n');
+  const defaultTsConfig = buildDefaultFrontendTsConfig();
+
+  const findGeneratedFile = (relativePath: string) =>
+    generatedFiles.find((file) => normalizePath(file.relativePath) === normalizePath(relativePath));
+
+  const generatedScreenCandidate = [
+    'src/pages/landing/index.tsx',
+    'src/pages/index.tsx',
+    'src/pages/home/index.tsx',
+    'src/components/screens/LandingPage.tsx',
+    'src/components/screens/HomePage.tsx'
+  ].find((candidate) => findGeneratedFile(candidate));
+
+  const buildAppEntrypoint = (targetPath: string) => {
+    const importPath = buildRelativeImportPath('src/App.tsx', targetPath);
+    const componentName =
+      targetPath.includes('/landing/')
+        ? 'LandingPage'
+        : targetPath.includes('/home/')
+          ? 'HomePage'
+          : 'PrimaryScreen';
+
+    return [
+      `import ${componentName} from '${importPath}';`,
+      '',
+      'export default function App() {',
+      `  return <${componentName} />;`,
+      '}',
+      ''
+    ].join('\n');
+  };
+
+  const currentAppFile = findGeneratedFile('src/App.tsx');
+  const workspaceAppContent = getWorkspaceContent('src/App.tsx') || '';
+  const appLooksLikeStarter =
+    /AURA Starter|Project baru ini dibuat dari AURA IDE|import ['"]\.\/style\.css['"]|AURA_EMPTY_ENTRY|return null;?/i.test(
+      currentAppFile?.content || workspaceAppContent
+    );
+
+  upsertFile('index.html', getWorkspaceContent('index.html') || defaultIndexHtml, 'html');
+  upsertFile('src/main.tsx', getWorkspaceContent('src/main.tsx') || defaultMainTsx, 'typescript');
+  upsertFile('vite.config.ts', getWorkspaceContent('vite.config.ts') || defaultViteConfig, 'typescript');
+  upsertFile('tsconfig.json', getWorkspaceContent('tsconfig.json') || defaultTsConfig, 'json');
+
+  if (generatedScreenCandidate && (!currentAppFile || appLooksLikeStarter)) {
+    upsertFile('src/App.tsx', buildAppEntrypoint(generatedScreenCandidate), 'typescript');
+  }
+
+  return generatedFiles;
+};
+
+const ensureDeterministicMobileScaffold = (
+  generatedFiles: AiGeneratedFile[],
+  workspaceFiles: FileItem[] = [],
+  rootPath?: string | null
+) => {
+  const normalizedRoot = rootPath ? normalizePath(rootPath) : '';
+  const mobileSignal = generatedFiles.some((file) =>
+    isMobileRelativePath(file.relativePath) || /capacitor|android|ios|mobile app|bottom nav|safe-area/i.test(file.content)
+  );
+
+  if (!mobileSignal) {
+    return generatedFiles;
+  }
+
+  const existingCapacitorConfig = generatedFiles.find((file) => normalizePath(file.relativePath) === 'capacitor.config.ts')
+    || workspaceFiles.find((file) => normalizePath(getRelativeFilePath(file.path || file.id, normalizedRoot)) === 'capacitor.config.ts');
+
+  if (!existingCapacitorConfig) {
+    generatedFiles.push({
+      absolutePath: normalizedRoot ? normalizePath(`${normalizedRoot}/capacitor.config.ts`) : 'capacitor.config.ts',
+      relativePath: 'capacitor.config.ts',
+      name: 'capacitor.config.ts',
+      language: 'typescript',
+      content: [
+        "import type { CapacitorConfig } from '@capacitor/cli';",
+        '',
+        'const config: CapacitorConfig = {',
+        "  appId: 'com.aura.generated.app',",
+        "  appName: 'Aura Mobile App',",
+        "  webDir: 'dist',",
+        '  server: {',
+        "    androidScheme: 'https'",
+        '  }',
+        '};',
+        '',
+        'export default config;',
+        ''
+      ].join('\n')
+    });
+  }
+
+  return generatedFiles;
+};
 
 const resolveMissingRelativeModuleImport = (
   fromRelativePath: string,
@@ -1023,7 +1886,50 @@ const resolveMissingRelativeModuleImport = (
   return importPath;
 };
 
-export const normalizeGeneratedFrontendFiles = (
+const buildComponentStubFromImport = (statement: string) => {
+  const importMatch = statement.match(/import\s+(.+?)\s+from\s+["'][^"']+["']/);
+  if (!importMatch) return '';
+
+  const specifier = importMatch[1].trim();
+  const lines: string[] = ["import React from 'react';", ''];
+
+  const defaultPart = specifier.includes('{')
+    ? specifier.split('{')[0].replace(/,$/, '').trim()
+    : specifier;
+  const namedPartMatch = specifier.match(/\{([^}]+)\}/);
+  const namedExports = namedPartMatch
+    ? namedPartMatch[1]
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => item.split(/\s+as\s+/i)[0]?.trim())
+        .filter(Boolean) as string[]
+    : [];
+
+  if (defaultPart && !/^\*/.test(defaultPart)) {
+    lines.push(`const ${defaultPart} = () => null;`);
+    lines.push('');
+    lines.push(`export default ${defaultPart};`);
+  }
+
+  if (namedExports.length > 0) {
+    if (defaultPart && !/^\*/.test(defaultPart)) {
+      lines.push('');
+    }
+    namedExports.forEach((name, index) => {
+      lines.push(`export function ${name}() {`);
+      lines.push('  return null;');
+      lines.push('}');
+      if (index < namedExports.length - 1) {
+        lines.push('');
+      }
+    });
+  }
+
+  return `${lines.join('\n')}\n`;
+};
+
+const ensureMissingRelativeComponentStubs = (
   generatedFiles: AiGeneratedFile[],
   workspaceFiles: FileItem[] = [],
   rootPath?: string | null
@@ -1034,8 +1940,110 @@ export const normalizeGeneratedFrontendFiles = (
   );
   const generatedRelativePaths = new Set(generatedFiles.map((file) => normalizePath(file.relativePath)));
   const knownRelativePaths = new Set([...workspaceRelativePaths, ...generatedRelativePaths]);
+  const missingStubs = new Map<string, string>();
 
-  return generatedFiles.map((generatedFile) => {
+  generatedFiles.forEach((generatedFile) => {
+    const extension = getExtension(generatedFile.relativePath);
+    if (!SCRIPT_EXTENSIONS.has(extension)) return;
+
+    const importMatches = Array.from(
+      generatedFile.content.matchAll(/import\s+.+?\s+from\s+["'](\.[^"']+)["'];?/g)
+    );
+
+    importMatches.forEach((match) => {
+      const statement = match[0];
+      const importPath = match[1];
+      if (importPath.endsWith('.css')) return;
+
+      const resolvedTarget = normalizePath(resolveRelativeImportTarget(generatedFile.relativePath, importPath));
+      const directCandidates = [
+        resolvedTarget,
+        `${resolvedTarget}.tsx`,
+        `${resolvedTarget}.ts`,
+        `${resolvedTarget}.jsx`,
+        `${resolvedTarget}.js`,
+        `${resolvedTarget}/index.tsx`,
+        `${resolvedTarget}/index.ts`,
+        `${resolvedTarget}/index.jsx`,
+        `${resolvedTarget}/index.js`
+      ];
+
+      if (directCandidates.some((candidate) => knownRelativePaths.has(candidate))) {
+        return;
+      }
+
+      if (!/^(src\/components\/|src\/pages\/|src\/screens\/)/i.test(resolvedTarget)) {
+        return;
+      }
+
+      const stubRelativePath = `${resolvedTarget}.tsx`;
+      if (knownRelativePaths.has(stubRelativePath) || missingStubs.has(stubRelativePath)) {
+        return;
+      }
+
+      const stubContent = buildComponentStubFromImport(statement);
+      if (!stubContent.trim()) {
+        return;
+      }
+
+      missingStubs.set(stubRelativePath, stubContent);
+      knownRelativePaths.add(stubRelativePath);
+    });
+  });
+
+  missingStubs.forEach((content, relativePath) => {
+    const absolutePath = normalizedRoot ? normalizePath(`${normalizedRoot}/${relativePath}`) : relativePath;
+    generatedFiles.push({
+      absolutePath,
+      relativePath,
+      name: getBaseName(relativePath),
+      content,
+      language: getLanguageByExtension(relativePath)
+    });
+  });
+
+  return generatedFiles;
+};
+
+export const normalizeGeneratedFrontendFiles = (
+  generatedFiles: AiGeneratedFile[],
+  workspaceFiles: FileItem[] = [],
+  rootPath?: string | null
+) => {
+  const normalizedRoot = rootPath ? normalizePath(rootPath) : '';
+  const frontendSignal = generatedFiles.some((file) =>
+    /^src\/(App\.tsx|main\.tsx|components\/|pages\/|index\.css|data\/|assets\/|lib\/)/i.test(normalizePath(file.relativePath))
+  );
+  const mobileSignal = generatedFiles.some((file) => isMobileRelativePath(file.relativePath) || /capacitor|android|ios|mobile app|safe-area/i.test(file.content));
+  const backendOrDesktopSignal = generatedFiles.some((file) => isBackendOrDesktopRelativePath(file.relativePath));
+  const constrainToWebProduction = frontendSignal && !mobileSignal && !backendOrDesktopSignal;
+  const constrainToMobileProduction = mobileSignal && !backendOrDesktopSignal;
+  const relocatedFiles = generatedFiles
+    .filter((file) => isAcceptableGeneratedPath(file.relativePath))
+    .filter((file) => {
+      if (constrainToMobileProduction) return isMobileProductionAllowedPath(file.relativePath);
+      if (constrainToWebProduction) return isWebProductionAllowedPath(file.relativePath);
+      return true;
+    })
+    .map((file) => {
+    const nextRelativePath = normalizeGeneratedRelativePath(file.relativePath);
+    const nextAbsolutePath = normalizedRoot ? normalizePath(`${normalizedRoot}/${nextRelativePath}`) : nextRelativePath;
+    return nextRelativePath === file.relativePath
+      ? file
+      : {
+          ...file,
+          relativePath: nextRelativePath,
+          absolutePath: nextAbsolutePath,
+          name: nextRelativePath.split('/').pop() || file.name
+        };
+    });
+  const workspaceRelativePaths = new Set(
+    workspaceFiles.map((file) => getRelativeFilePath(file.path || file.id, normalizedRoot)).map(normalizePath)
+  );
+  const generatedRelativePaths = new Set(relocatedFiles.map((file) => normalizePath(file.relativePath)));
+  const knownRelativePaths = new Set([...workspaceRelativePaths, ...generatedRelativePaths]);
+
+  const normalizedFiles = relocatedFiles.map((generatedFile) => {
     const extension = getExtension(generatedFile.relativePath);
     if (!SCRIPT_EXTENSIONS.has(extension)) {
       return generatedFile;
@@ -1086,6 +2094,12 @@ export const normalizeGeneratedFrontendFiles = (
           content: nextContent
         };
   });
+
+  const withDeterministicScaffold = ensureDeterministicFrontendScaffold(normalizedFiles, workspaceFiles, rootPath);
+  const withDeterministicMobileScaffold = ensureDeterministicMobileScaffold(withDeterministicScaffold, workspaceFiles, rootPath);
+  const withTailwindEntrypoints = ensureTailwindEntrypoints(withDeterministicMobileScaffold, workspaceFiles, rootPath);
+  const withMissingComponentStubs = ensureMissingRelativeComponentStubs(withTailwindEntrypoints, workspaceFiles, rootPath);
+  return ensureGeneratedPackageManifest(withMissingComponentStubs, workspaceFiles, rootPath);
 };
 
 export const extractAiGeneratedFiles = (
@@ -1102,7 +2116,7 @@ export const extractAiGeneratedFiles = (
 
   matches.forEach((match) => {
     const info = (match[1] || '').trim();
-    const content = (match[2] || '').replace(/\s+$/, '');
+    const content = sanitizeGeneratedCodeContent((match[2] || '').replace(/\s+$/, ''));
     if (!content.trim()) return;
     const preface = responseText.slice(Math.max(0, (match.index || 0) - 180), match.index || 0);
     let candidatePath = extractFilePathFromFenceInfo(info, preface);

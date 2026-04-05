@@ -1,9 +1,9 @@
 import { useAppStore } from '../store/useAppStore';
 import { getGeminiAI } from '../services/geminiService';
 import { fetchOpenRouterModels, generateOpenRouterContent } from '../services/openRouterService';
-import { fetchBytezModels } from '../services/bytezService';
+import { fetchBytezModels, generateBytezContent } from '../services/bytezService';
 import { generateSumopodContent } from '../services/sumopodService';
-import { fetchPuterModels } from '../services/puterService';
+import { fetchPuterModels, generatePuterContent } from '../services/puterService';
 
 export const useAiManager = (appendTerminalOutput: (data: string | string[]) => void) => {
   const store = useAppStore();
@@ -42,6 +42,21 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
             : provider === 'gemini'
               ? 'Gemini'
               : provider;
+
+  const CONNECTION_TEST_PROBE = 'Balas tepat dengan token ini tanpa kata tambahan: AURA_OK';
+
+  const validateDeepTestResponse = (provider: string, content: unknown) => {
+    const text = typeof content === 'string' ? content.trim() : String(content ?? '').trim();
+    if (!text) {
+      throw new Error(`Provider ${providerLabel(provider)} merespons kosong saat deep test.`);
+    }
+
+    if (!/AURA_OK/i.test(text)) {
+      throw new Error(`Provider ${providerLabel(provider)} merespons, tetapi hasil deep test tidak sesuai token validasi.`);
+    }
+
+    return text;
+  };
 
   const normalizeAiError = (error: any) => {
     if (error?.name === 'AbortError') {
@@ -129,44 +144,77 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
 
     store.setTestingStatus((prev: any) => ({ ...prev, [provider]: 'loading' }));
     store.setTestError((prev: any) => ({ ...prev, [provider]: '' }));
-    appendTerminalOutput(`[AI] Menguji koneksi ${providerLabel(provider)} dengan model ${activeModel}...`);
+    appendTerminalOutput(`[AI] Menjalankan deep test ${providerLabel(provider)} dengan model ${activeModel}...`);
     try {
       if (provider === 'gemini') {
         const ai = getGeminiAI(store.geminiApiKey);
-        await withTimeout(ai.models.generateContent({
+        const response = await withTimeout(ai.models.generateContent({
           model: store.selectedModel,
-          contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
-        }), CONNECTION_TEST_TIMEOUT_MS, 'Tes koneksi Gemini timeout. Coba lagi.');
+          contents: [{ role: 'user', parts: [{ text: CONNECTION_TEST_PROBE }] }]
+        }), CONNECTION_TEST_TIMEOUT_MS, 'Deep test Gemini timeout. Coba lagi.');
+        validateDeepTestResponse(provider, response.text);
       } else if (provider === 'openrouter') {
-        await withTimeout(
-          generateOpenRouterContent(store.openRouterModel, 'ping', store.openRouterApiKey, [], []),
+        const response = await withTimeout(
+          generateOpenRouterContent(store.openRouterModel, CONNECTION_TEST_PROBE, store.openRouterApiKey, [], []),
           CONNECTION_TEST_TIMEOUT_MS,
-          'Tes koneksi OpenRouter timeout. Coba lagi.'
+          'Deep test OpenRouter timeout. Coba lagi.'
         );
+        validateDeepTestResponse(provider, response);
       } else if (provider === 'bytez') {
-        await withTimeout(fetchBytezModels(store.bytezApiKey), CONNECTION_TEST_TIMEOUT_MS, 'Tes koneksi Bytez timeout. Coba lagi.');
+        const response = await withTimeout(
+          generateBytezContent(
+            store.bytezModel,
+            CONNECTION_TEST_PROBE,
+            store.bytezApiKey,
+            store.geminiApiKey,
+            [],
+            []
+          ),
+          CONNECTION_TEST_TIMEOUT_MS,
+          'Deep test Bytez timeout. Coba lagi.'
+        );
+        validateDeepTestResponse(provider, response);
       } else if (provider === 'sumopod') {
-        await withTimeout(
+        const response = await withTimeout(
           generateSumopodContent(
             store.sumopodApiKey,
             store.sumopodModel,
-            [{ role: 'user', content: 'ping' }],
-            { temperature: 0, max_tokens: 1 }
+            [{ role: 'user', content: CONNECTION_TEST_PROBE }],
+            { temperature: 0, max_tokens: 16 }
           ),
           CONNECTION_TEST_TIMEOUT_MS,
-          'Tes koneksi SumoPod timeout. Coba lagi.'
+          'Deep test SumoPod timeout. Coba lagi.'
         );
+        validateDeepTestResponse(provider, response);
       } else if (provider === 'puter') {
-        await withTimeout(fetchPuterModels(), CONNECTION_TEST_TIMEOUT_MS, 'Tes koneksi Puter.js timeout. Coba lagi.');
+        const response = await withTimeout(
+          generatePuterContent(store.puterModel, [{ role: 'user', content: CONNECTION_TEST_PROBE }], true),
+          CONNECTION_TEST_TIMEOUT_MS,
+          'Deep test Puter.js timeout. Coba lagi.'
+        );
+        validateDeepTestResponse(provider, response);
       } else if (provider === 'ollama') {
         const { signal, dispose } = createTimeoutSignal(CONNECTION_TEST_TIMEOUT_MS);
         let res: Response;
         try {
-          res = await fetch(`${store.ollamaUrl}/api/tags`, { signal });
+          res = await fetch(`${store.ollamaUrl}/api/generate`, {
+            method: 'POST',
+            signal,
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: activeModel,
+              prompt: CONNECTION_TEST_PROBE,
+              stream: false
+            })
+          });
         } finally {
           dispose();
         }
         if (!res.ok) throw new Error('Gagal terhubung ke Ollama');
+        const data = await res.json();
+        validateDeepTestResponse(provider, data?.response);
       }
       store.setTestingStatus((prev: any) => ({ ...prev, [provider]: 'success' }));
       store.setTestMeta((prev: any) => ({
@@ -177,7 +225,7 @@ export const useAiManager = (appendTerminalOutput: (data: string | string[]) => 
           success: true
         }
       }));
-      appendTerminalOutput(`[AI] ${providerLabel(provider)} terhubung. Model aktif: ${activeModel}`);
+      appendTerminalOutput(`[AI] ${providerLabel(provider)} lolos deep test. Model aktif: ${activeModel}`);
     } catch (err: any) {
       const message = normalizeAiError(err);
       store.setTestingStatus((prev: any) => ({ ...prev, [provider]: 'error' }));

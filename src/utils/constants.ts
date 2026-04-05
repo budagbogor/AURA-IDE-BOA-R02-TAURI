@@ -371,6 +371,8 @@ export const DEVELOPER_TASK_PRESETS = [
       "Implement UI with Tailwind-first patterns and readable utility composition",
       "Use reusable sections/components and explicit design tokens",
       "Replace the real entrypoint such as src/App.tsx when building a new screen or app",
+      "Make sure all generated components are actually wired into the main page or route tree",
+      "Ensure package.json, style entry, and Tailwind wiring are complete when Tailwind is chosen",
       "Keep frontend in one coherent app structure unless user explicitly asks for multi-package architecture",
       "Minimize dependencies and only add packages with clear implementation value",
       "Prefer a calm product UI over effects-heavy or template-looking output",
@@ -387,6 +389,33 @@ export const DEVELOPER_TASK_PRESETS = [
       puter: 'openrouter:anthropic/claude-sonnet-4.5',
       gemini: 'gemini-2.0-pro-exp-02-05',
       ollama: 'llama3'
+    }
+  },
+  {
+    id: 'mobile-app',
+    label: 'Mobile App',
+    description: 'Aplikasi mobile hybrid berbasis Capacitor dengan pola mobile-first.',
+    skillId: 'Aura Architect',
+    agentId: 'architect',
+    systemInstruction: 'You are solving a mobile application task using a deterministic Capacitor + React architecture. Think mobile-first, touch-first, and app-first. Keep one healthy app shell, wire Capacitor config correctly, prefer Tailwind CSS v4 for shared UI styling when appropriate, and avoid pretending a plain web landing page is already a mobile product.',
+    aiRules: 'Utamakan arsitektur mobile yang rapi: satu app frontend utama, entrypoint jelas, capacitor.config.ts valid, navigation dan screen composition terasa seperti aplikasi mobile, touch target sehat, state penting lengkap, dan dependency tetap ramping. Jangan membuat struktur web liar atau backend tambahan jika user hanya meminta aplikasi mobile.',
+    executionChecklist: [
+      "Define the core app shell and mobile navigation pattern before writing screens",
+      "Use a deterministic Capacitor + React structure with a valid capacitor.config.ts",
+      "Keep touch targets, spacing, and safe-area behavior mobile-first",
+      "Build reusable screens/components rather than one giant page file",
+      "Use realistic seed data and connected navigation targets for screens",
+      "Keep one healthy main app entry and avoid fragmented package layout",
+      "Ensure package.json and config files stay aligned with Capacitor usage",
+      "Verify the result still runs as a normal Vite app while staying mobile-ready"
+    ],
+    providerModels: {
+      sumopod: 'gemini/gemini-2.5-pro',
+      openrouter: 'anthropic/claude-sonnet-4.5',
+      bytez: 'google/gemini-2.5-pro',
+      puter: 'openrouter:anthropic/claude-sonnet-4.5',
+      gemini: 'gemini-2.0-pro-exp-02-05',
+      ollama: 'deepseek-coder'
     }
   },
   {

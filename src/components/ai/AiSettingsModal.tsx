@@ -270,7 +270,7 @@ export function AiSettingsModal(props: Props) {
             </button>
             <button onClick={() => void onTestConnection()} disabled={testingStatus === 'loading' || (provider !== 'puter' && provider !== 'ollama' && !activeAiCredential.trim())} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-40">
               <Play size={13} />
-              {testingStatus === 'loading' ? 'Testing...' : 'Test Connection'}
+              {testingStatus === 'loading' ? 'Testing...' : 'Deep Test'}
             </button>
             <div className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${testingStatus === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : testingStatus === 'error' ? 'border-red-500/30 bg-red-500/10 text-red-200' : testingStatus === 'loading' ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-white/10 bg-white/5 text-[#a8a8a8]'}`}>
               {testingStatus || 'idle'}
@@ -278,10 +278,10 @@ export function AiSettingsModal(props: Props) {
           </div>
 
           <div className="rounded-xl border border-white/8 bg-[#0d0d0d] px-3 py-2 text-[11px] leading-5 text-[#98a0ad]">
-            Pengaturan ini berlaku global. Tes koneksi sekarang memakai jalur cepat dengan timeout singkat agar loading tidak terlalu lama dan kegagalan langsung terlihat jelas.
+            Pengaturan ini berlaku global. Deep test sekarang mencoba generate nyata kecil dan memvalidasi token respons, jadi status <code>success</code> lebih dekat ke kondisi API key dan model yang benar-benar bisa dipakai.
             {activeTestMeta?.checkedAt ? <div className="mt-2 text-[#7f8795]">Tes terakhir: {new Date(activeTestMeta.checkedAt).toLocaleTimeString()} • model {activeTestMeta.model || '-'}</div> : null}
             {testingStatus === 'error' && testError ? <div className="mt-2 text-red-300">{testError}</div> : null}
-            {testingStatus === 'loading' ? <div className="mt-2 text-amber-300">Sedang menguji koneksi cepat. Timeout otomatis 9 detik.</div> : null}
+            {testingStatus === 'loading' ? <div className="mt-2 text-amber-300">Sedang menjalankan deep test generate kecil. Timeout otomatis 9 detik.</div> : null}
           </div>
         </div>
       </div>
