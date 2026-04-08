@@ -4,21 +4,40 @@ import type { AiActivityEntry } from '@/features/workspace/workspaceSupport';
 export const isLikelyCodingPrompt = (prompt: string) =>
   /(buat|bikin|generate|create|refactor|fix|perbaiki|ubah|edit|implement|scaffold|bangun|coding|code|file|component|api|ui|ux)/i.test(prompt);
 
-export const buildAttachmentPromptContext = (attachments: AttachedFile[]) => {
-  if (!attachments.length) return '';
+export const isErrorFixPrompt = (prompt: string, attachments: AttachedFile[] = []) => {
+  const hasImageAttachment = attachments.some((file) => file.type.startsWith('image/'));
+  return (
+    /(error|bug|fix|perbaiki|debug|stack trace|exception|failed|gagal|warning|warn|cannot|undefined|null|traceback|vite|build error|console)/i.test(prompt) ||
+    (hasImageAttachment && /(screenshot|screen shoot|error|bug|console|log|fix|perbaiki|debug)/i.test(prompt))
+  );
+};
 
-  const sections = attachments.map((file, index) => {
+export const trimChatHistoryForAi = (history: Array<{ role: string; content: string }>, prioritizeSpeed = false) => {
+  const limit = prioritizeSpeed ? 4 : 10;
+  return history.slice(-limit);
+};
+
+export const buildAttachmentPromptContext = (attachments: AttachedFile[], options?: { compact?: boolean }) => {
+  if (!attachments.length) return '';
+  const compact = options?.compact ?? false;
+  const attachmentLimit = compact ? 4 : attachments.length;
+  const visibleAttachments = attachments.slice(0, attachmentLimit);
+
+  const sections = visibleAttachments.map((file, index) => {
     if (file.type.startsWith('image/')) {
       return [
         `Attachment ${index + 1}: ${file.name}`,
         'Type: image',
-        'Instruction: analisis gambar ini jika relevan dengan prompt.'
+        compact
+          ? 'Instruction: fokus baca pesan error, nama file, stack trace, overlay build/dev, dan petunjuk root cause dari gambar ini.'
+          : 'Instruction: analisis gambar ini jika relevan dengan prompt.'
       ].join('\n');
     }
 
     if (file.content) {
-      const trimmedContent = file.content.length > 12000
-        ? `${file.content.slice(0, 12000)}\n...[truncated]`
+      const maxLength = compact ? 6000 : 12000;
+      const trimmedContent = file.content.length > maxLength
+        ? `${file.content.slice(0, maxLength)}\n...[truncated]`
         : file.content;
 
       return [
@@ -36,8 +55,22 @@ export const buildAttachmentPromptContext = (attachments: AttachedFile[]) => {
     ].join('\n');
   });
 
-  return ['Attached Context Files:', ...sections].join('\n\n');
+  const hiddenAttachmentNotice = attachments.length > attachmentLimit
+    ? `\n\nAdditional attachments omitted for speed: ${attachments.length - attachmentLimit}`
+    : '';
+
+  return ['Attached Context Files:', ...sections].join('\n\n') + hiddenAttachmentNotice;
 };
+
+const buildErrorFixContract = () => [
+  'Fast Error Fix Contract:',
+  '- Prioritaskan kecepatan diagnosis dan patch yang aman.',
+  '- Gunakan screenshot, console log, stack trace, dan nama file untuk menemukan root cause paling mungkin.',
+  '- Fokus pada file yang sudah ada lebih dulu. Jangan refactor besar jika patch kecil cukup.',
+  '- Jika error menunjukkan import path, module missing, undefined symbol, atau build failure, perbaiki penyebab langsungnya sebelum polish lain.',
+  '- Jika bukti belum cukup, lakukan asumsi paling masuk akal dan tulis patch yang paling kecil.',
+  '- Output tetap harus mengikuti Workspace Output Contract agar AURA bisa langsung menerapkan file.'
+].join('\n');
 
 export const buildWorkspaceOutputContract = () => [
   'Workspace Output Contract:',
@@ -224,6 +257,7 @@ export const buildMobileAppModeContract = () => [
   '- Susun layar seperti aplikasi: top app bar, bottom tabs untuk 3-5 destinasi utama bila cocok, stack/detail screen untuk drill-down, dan back affordance yang jelas.',
   '- Prioritaskan file di src/App.tsx, src/main.tsx, src/components/*, src/pages/* atau src/screens/*, src/data/*, src/hooks/*, src/lib/*, src/assets/*, dan capacitor.config.ts.',
   '- Jaga safe area, touch targets, scroll containers, keyboard overlap, sticky bottom actions, spacing mobile-first, dan hindari layout marketing page yang hanya disamarkan sebagai mobile app.',
+  '- Pastikan layout tidak keluar kanvas preview: hindari transform/position absolute/fixed berlebihan untuk struktur utama, set root/shell dengan min-h-screen, w-full, overflow-x-hidden, dan gunakan .aura-mobile-shell atau .aura-mobile-screen bila membuat frame mobile.',
   '- Untuk list dan feed, gunakan seed arrays di src/data/*, key stabil, card/row reusable, empty/loading/error/offline states, serta hindari satu file raksasa berisi DOM statis.',
   '- Jika user meminta data nyata, siapkan seed data screen-friendly seperti cards, lists, stats, booking slots, vehicles, orders, notifications, chats, cart items, atau account summaries sesuai konteks app.',
   '- Sertakan strategi gambar/media yang realistis: src/assets, inline SVG, URL gambar masuk akal, atau fallback visual yang tetap rapi. Jangan tinggalkan image slot kosong.',
@@ -232,6 +266,25 @@ export const buildMobileAppModeContract = () => [
   '- Jangan membuat app.json, babel.config.js, atau metro.config.js untuk baseline Capacitor + React. Gunakan vite.config.ts, tsconfig.json, package.json, src/index.css, dan capacitor.config.ts.',
   '- Jaga package tetap ramping. Jangan menambah native plugin kecuali prompt membutuhkan kamera, geolocation, filesystem, notifications, biometrics, atau capability native spesifik.',
   '- Jangan membuat folder android/ atau ios/ dari model secara bebas. Cukup siapkan scaffold konfigurasi dan aplikasi utama yang mobile-ready sampai user meminta native sync/build.'
+].join('\n');
+
+export const buildMobileUiUxDesignContract = () => [
+  'Mobile UI/UX Design Contract:',
+  '- Treat mobile as touch-first product design, not a narrow desktop viewport. Define the user journey, primary task, and screen hierarchy before choosing visual decoration.',
+  '- The app must render in a normal browser preview without black screen, duplicated off-canvas panels, huge negative margins, or rotated/translated root containers.',
+  '- Respect platform conventions conceptually: iOS-style back affordance/top actions and bottom tabs where appropriate; Android-style top back/menu patterns, bottom navigation, or FAB when the primary action needs it.',
+  '- Keep touch targets generous: aim for at least 44px on iOS-like targets and 48px on Android-like targets, with at least 8px spacing between adjacent controls.',
+  '- Keep mobile typography readable: body text should usually be 16px+, metadata/labels should not become tiny, line-height must feel comfortable, and hierarchy must be visible through size, weight, and color.',
+  '- Keep contrast accessible: normal text should target WCAG AA contrast, UI boundaries and icons need visible contrast, and color must never be the only signal for errors, warnings, or status.',
+  '- Add interaction feedback: pressed states, disabled states, loading state for operations over roughly 1 second, and clear recovery text for errors. Avoid silent taps.',
+  '- Use progressive disclosure: keep each screen focused on its primary job, move detail into drill-down views, and avoid overwhelming first screens with every feature at once.',
+  '- For forms, design for thumbs and keyboards: correct input types, concise labels, inline validation, visible error text, disabled submit while invalid, and no keyboard-covered primary action.',
+  '- For media-heavy screens, reserve image aspect-ratio space, provide fallback visuals, and keep layout stable when remote images fail or load slowly.',
+  '- For lists, use reusable cards/rows, stable keys, realistic seed data, empty states, loading skeletons, pull-to-refresh or refresh affordance when context fits, and avoid massive static markup.',
+  '- Create a compact semantic design system in code: atmosphere, palette roles, typography scale, spacing rhythm, radii, elevation, focus/pressed states, and icon style. Reflect it through reusable components and tokens.',
+  '- Convert vague prompts into specific UI decisions internally: product archetype, target user, screen set, navigation pattern, content density, style mood, palette role, and component inventory.',
+  '- Separate content from UI where useful: put products, menu items, onboarding slides, profile data, cart items, orders, notifications, and settings rows in src/data/* rather than hardcoding every repeated item.',
+  '- Prefer calm, product-grade motion: opacity/transform transitions, restrained haptics language if described, no flashy motion that hurts performance or clarity.'
 ].join('\n');
 
 export const buildComponentSystemQualityGate = () => [
@@ -250,7 +303,8 @@ export const buildAiPromptEnvelope = ({
   preferredTargets,
   executionPlan,
   attachmentContext,
-  prompt
+  prompt,
+  prioritizeFastFix = false
 }: {
   developerContext: string;
   projectRulesContext?: string;
@@ -259,6 +313,7 @@ export const buildAiPromptEnvelope = ({
   executionPlan: string[];
   attachmentContext: string;
   prompt: string;
+  prioritizeFastFix?: boolean;
 }) => {
   const domainContext = `Active Work Domains: ${domains.join(', ')}`;
   const targetContext = preferredTargets.length > 0
@@ -272,18 +327,20 @@ export const buildAiPromptEnvelope = ({
     domainContext,
     targetContext,
     planContext,
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildProfessionalUiContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiStyleDecisionContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiDesignSystemGenerationContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiAntiPatternGate() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildUiCriticalQualityGate() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildTailwindUiContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildFrontendAppReadyContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildFrontendRealismContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildFrontendSeedDataBlueprint(prompt) : '',
-    domains.includes('frontend') || domains.includes('design-system') ? buildWebProductionModeContract() : '',
-    domains.includes('mobile') ? buildMobileAppModeContract() : '',
-    domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile') ? buildComponentSystemQualityGate() : '',
+    prioritizeFastFix ? buildErrorFixContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildProfessionalUiContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildUiStyleDecisionContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildUiDesignSystemGenerationContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildUiAntiPatternGate() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildUiCriticalQualityGate() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildTailwindUiContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildFrontendAppReadyContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildFrontendRealismContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildFrontendSeedDataBlueprint(prompt) : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system')) ? buildWebProductionModeContract() : '',
+    !prioritizeFastFix && domains.includes('mobile') ? buildMobileAppModeContract() : '',
+    !prioritizeFastFix && domains.includes('mobile') ? buildMobileUiUxDesignContract() : '',
+    !prioritizeFastFix && (domains.includes('frontend') || domains.includes('design-system') || domains.includes('mobile')) ? buildComponentSystemQualityGate() : '',
     buildWorkspaceOutputContract(),
     attachmentContext,
     `User Request:\n${prompt}`
@@ -490,6 +547,7 @@ export const buildUiReviewLoopPrompt = ({
     buildFrontendSeedDataBlueprint(userPrompt),
     buildWebProductionModeContract(),
     domains.includes('mobile') || /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileAppModeContract() : '',
+    domains.includes('mobile') || /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileUiUxDesignContract() : '',
     buildComponentSystemQualityGate(),
     '',
     'UI quality checklist:',
@@ -550,6 +608,7 @@ export const buildStarterReplacementPrompt = ({
     buildFrontendSeedDataBlueprint(userPrompt),
     buildWebProductionModeContract(),
     /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileAppModeContract() : '',
+    /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileUiUxDesignContract() : '',
     buildComponentSystemQualityGate(),
     buildWorkspaceOutputContract(),
     '',
@@ -604,6 +663,7 @@ export const buildVerificationRecoveryPrompt = ({
     buildFrontendAppReadyContract(),
     buildFrontendRealismContract(),
     domains.includes('mobile') || /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileAppModeContract() : '',
+    domains.includes('mobile') || /mobile|android|ios|apk|capacitor/i.test(userPrompt) ? buildMobileUiUxDesignContract() : '',
     buildComponentSystemQualityGate(),
     buildWorkspaceOutputContract(),
     '',

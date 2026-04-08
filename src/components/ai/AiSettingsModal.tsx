@@ -1,4 +1,4 @@
-import { Play, RotateCcw, Settings2, X } from 'lucide-react';
+import { FileUp, Play, RotateCcw, Settings2, Trash2, X } from 'lucide-react';
 import type { AiProvider, VisualReviewProvider } from '@/types';
 
 type TaskPreset = {
@@ -47,6 +47,8 @@ type Props = {
   onResetProvider: () => void;
   onTestConnection: () => void | Promise<void>;
   onSignInPuter?: () => void | Promise<void>;
+  onImportSumopodModels?: (file: File) => void | Promise<void>;
+  onClearSumopodModels?: () => void;
   onCredentialChange: (value: string) => void;
   onToggleAutoApplyDrafts: (enabled: boolean) => void;
   onApplyDeveloperTaskPreset: (presetId: string) => void;
@@ -62,6 +64,7 @@ type Props = {
   testingStatus: string | undefined;
   testError?: string;
   activeTestMeta?: { checkedAt?: number; model?: string; success?: boolean };
+  sumopodCustomModelCount?: number;
 };
 
 export function AiSettingsModal(props: Props) {
@@ -82,6 +85,8 @@ export function AiSettingsModal(props: Props) {
     onResetProvider,
     onTestConnection,
     onSignInPuter,
+    onImportSumopodModels,
+    onClearSumopodModels,
     onCredentialChange,
     onToggleAutoApplyDrafts,
     onApplyDeveloperTaskPreset,
@@ -96,7 +101,8 @@ export function AiSettingsModal(props: Props) {
     isFetchingModels,
     testingStatus,
     testError,
-    activeTestMeta
+    activeTestMeta,
+    sumopodCustomModelCount = 0
   } = props;
 
   if (!isOpen) return null;
@@ -217,6 +223,49 @@ export function AiSettingsModal(props: Props) {
                     <span className="max-w-[220px] truncate">{chip.name}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+          ) : null}
+
+          {provider === 'sumopod' ? (
+            <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/[0.05] p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100">SumoPod Model Catalog</div>
+                  <div className="mt-1 text-[10px] leading-5 text-[#9db2bf]">
+                    Upload daftar model terbaru dalam format JSON, CSV/TSV, atau teks tabel hasil copy-paste. Dropdown akan langsung memakai katalog custom yang tersimpan lokal.
+                  </div>
+                  <div className="mt-1 text-[10px] text-cyan-200">
+                    {sumopodCustomModelCount > 0
+                      ? `Custom catalog aktif: ${sumopodCustomModelCount} model.`
+                      : 'Saat ini memakai katalog bawaan AURA.'}
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-cyan-500/25 bg-cyan-500/10 px-3 py-2 text-[11px] font-semibold text-cyan-50 transition-colors hover:bg-cyan-500/15">
+                    <FileUp size={13} />
+                    Upload Catalog
+                    <input
+                      type="file"
+                      accept=".json,.csv,.tsv,.txt,application/json,text/csv,text/tab-separated-values,text/plain"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        if (file) void onImportSumopodModels?.(file);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => onClearSumopodModels?.()}
+                    disabled={sumopodCustomModelCount === 0}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 size={13} />
+                    Clear
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}

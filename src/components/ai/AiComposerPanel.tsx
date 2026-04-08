@@ -53,6 +53,7 @@ type Props = {
   attachedFiles: AttachedFile[];
   isAiLoading: boolean;
   processingEntry: ProcessingEntry | null;
+  fastFixMode?: boolean;
   onOpenSettings: () => void;
   onClearChat: () => void;
   onClosePanel: () => void;
@@ -63,6 +64,7 @@ type Props = {
   onRemoveAttachment: (index: number) => void;
   onOpenAttach: () => void;
   onTextareaKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onTextareaPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void | Promise<void>;
 };
 
 export function AiComposerPanel({
@@ -83,6 +85,7 @@ export function AiComposerPanel({
   attachedFiles,
   isAiLoading,
   processingEntry,
+  fastFixMode = false,
   onOpenSettings,
   onClosePanel,
   onChangeTaskPreset,
@@ -91,7 +94,8 @@ export function AiComposerPanel({
   onStopPrompt,
   onRemoveAttachment,
   onOpenAttach,
-  onTextareaKeyDown
+  onTextareaKeyDown,
+  onTextareaPaste
 }: Props) {
   const providerName = providerOptions.find((item) => item.id === provider)?.name || provider;
   const modelName = modelOptions.find((item) => item.id === activeModel)?.name || activeModel;
@@ -153,6 +157,12 @@ export function AiComposerPanel({
               </select>
               <span className="truncate text-[#727b88]">{selectedSkill}</span>
             </div>
+            {fastFixMode ? (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-100">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+                Fast Error Fix active
+              </div>
+            ) : null}
           </div>
           <div className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] ${
             testingStatus === 'success'
@@ -308,9 +318,13 @@ export function AiComposerPanel({
           value={chatInput}
           onChange={(event) => onChangeChatInput(event.target.value)}
           onKeyDown={onTextareaKeyDown}
+          onPaste={(event) => void onTextareaPaste(event)}
           placeholder="Tulis prompt AI di sini..."
           className="min-h-[88px] w-full resize-none rounded-lg border border-white/10 bg-[#0f0f0f] px-3 py-2.5 text-[12px] text-white outline-none transition-colors placeholder:text-[#666] focus:border-blue-500/40"
         />
+        <div className="mt-1 text-[10px] text-[#6f7785]">
+          Tempel screenshot langsung dengan `Ctrl+V`, atau pakai tombol Attach.
+        </div>
         {isAiLoading ? (
           <div className="mt-2 rounded-lg border border-blue-500/15 bg-blue-500/[0.06] px-3 py-2 text-[10px] text-[#cfe0ff]">
             <div className="flex items-center gap-2">

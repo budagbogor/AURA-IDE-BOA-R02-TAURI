@@ -28,47 +28,39 @@ export const PUTER_MODELS = [
 
 export const SUMOPOD_MODELS = [
   { id: 'auto-budget', name: 'Smart Auto-Budget (Termurah Otomatis)', provider: 'sumopod', inputPrice: 0, outputPrice: 0, context: 0 },
-  { id: 'seed-2-0-lite', name: 'Seed 2.0 Lite (Free)', provider: 'openai', inputPrice: 0, outputPrice: 0, context: 256000 },
-  { id: 'seed-2-0-lite-free', name: 'Seed 2.0 Lite Free (Free)', provider: 'byteplus', inputPrice: 0, outputPrice: 0, context: 256000 },
-  { id: 'seed-2-0-mini', name: 'Seed 2.0 Mini (Free)', provider: 'byteplus', inputPrice: 0, outputPrice: 0, context: 256000 },
-  { id: 'seed-2-0-mini-free', name: 'Seed 2.0 Mini Free (Free)', provider: 'byteplus', inputPrice: 0, outputPrice: 0, context: 256000 },
-  { id: 'seed-2-0-pro', name: 'Seed 2.0 Pro (Free)', provider: 'byteplus', inputPrice: 0, outputPrice: 0, context: 256000 },
-  { id: 'seed-2-0-pro-free', name: 'Seed 2.0 Pro Free (Free)', provider: 'byteplus', inputPrice: 0, outputPrice: 0, context: 256000 },
+  { id: 'seed-2-0-mini', name: 'Seed 2.0 Mini (90% Off - $0.01)', provider: 'byteplus', inputPrice: 0.01, outputPrice: 0.04, context: 256000 },
   { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small ($0.02)', provider: 'openai', inputPrice: 0.02, outputPrice: 0, context: 8191 },
+  { id: 'seed-2-0-lite', name: 'Seed 2.0 Lite (90% Off - $0.03)', provider: 'byteplus', inputPrice: 0.03, outputPrice: 0.2, context: 256000 },
+  { id: 'MiniMax-M2.7-highspeed', name: 'MiniMax M2.7 Highspeed (90% Off - $0.03)', provider: 'minimax', inputPrice: 0.03, outputPrice: 0.12, context: 204800 },
+  { id: 'seed-2-0-pro', name: 'Seed 2.0 Pro (90% Off - $0.05)', provider: 'byteplus', inputPrice: 0.05, outputPrice: 0.3, context: 256000 },
   { id: 'gpt-5-nano', name: 'GPT-5 Nano ($0.05)', provider: 'openai', inputPrice: 0.05, outputPrice: 0.4, context: 272000 },
   { id: 'gemini/gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite ($0.07)', provider: 'google', inputPrice: 0.07, outputPrice: 0.3, context: 1048576 },
-  { id: 'glm-5', name: 'GLM 5 ($0.10)', provider: 'z.ai', inputPrice: 0.1, outputPrice: 0.32, context: 200000 },
-  { id: 'glm-5.1', name: 'GLM 5.1 ($0.10)', provider: 'z.ai', inputPrice: 0.1, outputPrice: 0.32, context: 200000 },
+  { id: 'glm-5', name: 'GLM 5 (90% Off - $0.10)', provider: 'z.ai', inputPrice: 0.1, outputPrice: 0.32, context: 200000 },
+  { id: 'glm-5.1', name: 'GLM 5.1 (90% Off - $0.10)', provider: 'z.ai', inputPrice: 0.1, outputPrice: 0.32, context: 200000 },
   { id: 'gemini/gemini-2.0-flash', name: 'Gemini 2.0 Flash ($0.10)', provider: 'google', inputPrice: 0.1, outputPrice: 0.4, context: 1048576 },
   { id: 'gemini/gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite ($0.10)', provider: 'google', inputPrice: 0.1, outputPrice: 0.4, context: 1048576 },
   { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano ($0.10)', provider: 'openai', inputPrice: 0.1, outputPrice: 0.4, context: 1047576 },
-  { id: 'glm-5-turbo', name: 'GLM 5 Turbo ($0.12)', provider: 'z.ai', inputPrice: 0.12, outputPrice: 0.4, context: 200000 },
-  { id: 'glm-5-code', name: 'GLM 5 Code ($0.12)', provider: 'z.ai', inputPrice: 0.12, outputPrice: 0.5, context: 200000 },
+  { id: 'glm-5-turbo', name: 'GLM 5 Turbo (90% Off - $0.12)', provider: 'z.ai', inputPrice: 0.12, outputPrice: 0.4, context: 200000 },
   { id: 'text-embedding-3-large', name: 'Text Embedding 3 Large ($0.13)', provider: 'openai', inputPrice: 0.13, outputPrice: 0, context: 8191 },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini ($0.15)', provider: 'openai', inputPrice: 0.15, outputPrice: 0.6, context: 128000 },
   { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini ($0.25)', provider: 'openai', inputPrice: 0.25, outputPrice: 2, context: 272000 },
   { id: 'gpt-5-mini', name: 'GPT-5 Mini ($0.25)', provider: 'openai', inputPrice: 0.25, outputPrice: 2, context: 272000 },
-  { id: 'seed-1-8', name: 'Seed 1.8 ($0.25)', provider: 'byteplus', inputPrice: 0.25, outputPrice: 2, context: 224000 },
   { id: 'deepseek-v3-2', name: 'DeepSeek V3.2 ($0.28)', provider: 'byteplus', inputPrice: 0.28, outputPrice: 0.42, context: 96000 },
   { id: 'gemini/gemini-2.5-flash', name: 'Gemini 2.5 Flash ($0.30)', provider: 'google', inputPrice: 0.3, outputPrice: 2.5, context: 1048576 },
   { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini ($0.40)', provider: 'openai', inputPrice: 0.4, outputPrice: 1.6, context: 1047576 },
   { id: 'gemini/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview ($0.50)', provider: 'google', inputPrice: 0.5, outputPrice: 3, context: 1048576 },
   { id: 'glm-4-7', name: 'GLM 4.7 ($0.60)', provider: 'byteplus', inputPrice: 0.6, outputPrice: 2.2, context: 200000 },
-  { id: 'kimi-k2', name: 'Kimi K2 ($0.60)', provider: 'byteplus', inputPrice: 0.6, outputPrice: 2.5, context: 224000 },
-  { id: 'kimi-k2-thinking', name: 'Kimi K2 Thinking ($0.60)', provider: 'byteplus', inputPrice: 0.6, outputPrice: 2.5, context: 224000 },
-  { id: 'kimi-k2-5-260127', name: 'Kimi K2.5 ($0.60)', provider: 'byteplus', inputPrice: 0.6, outputPrice: 3, context: 224000 },
+  { id: 'kimi-k2-5-260127', name: 'Kimi K2.5 260127 ($0.60)', provider: 'byteplus', inputPrice: 0.6, outputPrice: 3, context: 256000 },
   { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 ($1.00)', provider: 'anthropic', inputPrice: 1, outputPrice: 5, context: 200000 },
   { id: 'gemini/gemini-2.5-pro', name: 'Gemini 2.5 Pro ($1.25)', provider: 'google', inputPrice: 1.25, outputPrice: 10, context: 1048576 },
   { id: 'gpt-5', name: 'GPT-5 ($1.25)', provider: 'openai', inputPrice: 1.25, outputPrice: 10, context: 272000 },
   { id: 'gpt-5.1', name: 'GPT-5.1 ($1.25)', provider: 'openai', inputPrice: 1.25, outputPrice: 10, context: 272000 },
   { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex ($1.25)', provider: 'openai', inputPrice: 1.25, outputPrice: 10, context: 272000 },
-  { id: 'deepseek-r1', name: 'DeepSeek R1 ($1.35)', provider: 'byteplus', inputPrice: 1.35, outputPrice: 5.4, context: 96000 },
   { id: 'gpt-5.2', name: 'GPT-5.2 ($1.75)', provider: 'openai', inputPrice: 1.75, outputPrice: 14, context: 272000 },
   { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex ($1.75)', provider: 'openai', inputPrice: 1.75, outputPrice: 14, context: 272000 },
   { id: 'gpt-4.1', name: 'GPT-4.1 ($2.00)', provider: 'openai', inputPrice: 2, outputPrice: 8, context: 1047576 },
   { id: 'gemini/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview ($2.00)', provider: 'google', inputPrice: 2, outputPrice: 12, context: 1048576 },
-  { id: 'gpt-4o', name: 'GPT-4o ($2.50)', provider: 'openai', inputPrice: 2.5, outputPrice: 10, context: 128000 },
-  { id: 'gpt-image-1', name: 'GPT Image 1 ($10.00)', provider: 'openai', inputPrice: 10, outputPrice: 40, context: 0 }
+  { id: 'gpt-4o', name: 'GPT-4o ($2.50)', provider: 'openai', inputPrice: 2.5, outputPrice: 10, context: 128000 }
 ];
 
 export const AI_PROVIDERS = [
@@ -335,6 +327,30 @@ export const DEVELOPER_TASK_PRESETS = [
     }
   },
   {
+    id: 'bug-fix',
+    label: 'Bug Fix',
+    description: 'Diagnosis error, analisis screenshot/log, root cause, dan patch cepat yang aman.',
+    skillId: 'Aura Debugger',
+    agentId: 'debugger',
+    systemInstruction: 'You are handling a fast bug-fix task. Diagnose from the strongest evidence first: screenshot overlays, console errors, stack traces, failing imports, runtime symptoms, and affected files. Prefer the smallest safe patch that restores the project quickly.',
+    aiRules: 'Utamakan root cause, patch kecil yang aman, dan kecepatan eksekusi. Gunakan screenshot error, console log, nama file, dan stack trace sebagai bukti utama. Hindari refactor besar jika masalah bisa diperbaiki langsung pada sumber error.',
+    executionChecklist: [
+      "Read screenshot, console text, and stack trace as primary evidence",
+      "Identify the most likely root cause before changing code",
+      "Patch the existing file or import path directly when possible",
+      "Keep changes minimal, targeted, and easy to verify",
+      "Prefer restoring build/runtime health before broader cleanup"
+    ],
+    providerModels: {
+      sumopod: 'gemini/gemini-2.5-flash',
+      openrouter: 'google/gemini-2.5-flash',
+      bytez: 'Qwen/Qwen2.5-Coder-32B-Instruct',
+      puter: 'openrouter:google/gemini-pro-1.5',
+      gemini: 'gemini-2.0-flash-thinking-exp',
+      ollama: 'qwen2.5-coder'
+    }
+  },
+  {
     id: 'automation',
     label: 'Automation',
     description: 'Scripting, CLI, workflow, agent tools, dan automasi developer.',
@@ -349,7 +365,7 @@ export const DEVELOPER_TASK_PRESETS = [
       "Keep automation observable and reversible"
     ],
     providerModels: {
-      sumopod: 'glm-5-code',
+      sumopod: 'seed-2-0-pro',
       openrouter: 'mistralai/devstral-small-2505:free',
       bytez: 'Qwen/Qwen2.5-Coder-32B-Instruct',
       puter: 'openrouter:mistralai/devstral-small-2505:free',
@@ -394,19 +410,24 @@ export const DEVELOPER_TASK_PRESETS = [
   {
     id: 'mobile-app',
     label: 'Mobile App',
-    description: 'Aplikasi mobile hybrid berbasis Capacitor dengan pola mobile-first dan screen map yang jelas.',
+    description: 'Aplikasi mobile hybrid berbasis Capacitor dengan UI/UX mobile-first, screen map, dan design system yang jelas.',
     skillId: 'Aura Architect',
     agentId: 'architect',
-    systemInstruction: 'You are solving a mobile application task using a deterministic Capacitor + React architecture. Think mobile-first, touch-first, and app-first. Borrow product-quality guidance from Expo/React Native agent skills for navigation, lists, safe areas, images, and app states, but keep AURA default output as Capacitor + React unless the user explicitly asks for Expo or React Native. Keep one healthy app shell, wire Capacitor config correctly, prefer Tailwind CSS v4 for shared UI styling when appropriate, and avoid pretending a plain web landing page is already a mobile product.',
-    aiRules: 'Utamakan arsitektur mobile yang rapi: satu app frontend utama, entrypoint jelas, capacitor.config.ts valid, screen map eksplisit, bottom tab atau stack-like navigation bila cocok, touch target sehat, safe-area/keyboard/scroll behavior masuk akal, state penting lengkap, seed data realistis, image fallback, dan dependency tetap ramping. Untuk baseline Capacitor + React, jangan tambahkan tailwindcss-react-native, nativewind, react-native, expo, metro, @react-navigation/*, app.json, babel.config.js, atau metro.config.js kecuali user secara eksplisit meminta React Native/Expo. Jangan membuat struktur web liar, backend tambahan, atau folder android/ios jika user hanya meminta aplikasi mobile.',
+    systemInstruction: 'You are solving a mobile application task using a deterministic Capacitor + React architecture. Think mobile-first, touch-first, app-first, accessibility-first, and design-system-first. Borrow product-quality guidance from mobile app design standards, Stitch prompt/design-system skills, and Expo/React Native agent skills for navigation, lists, safe areas, images, motion, accessibility, and app states, but keep AURA default output as Capacitor + React unless the user explicitly asks for Expo or React Native. Keep one healthy app shell, wire Capacitor config correctly, prefer Tailwind CSS v4 for shared UI styling when appropriate, and avoid pretending a plain web landing page is already a mobile product.',
+    aiRules: 'Utamakan arsitektur mobile yang rapi: satu app frontend utama, entrypoint jelas, capacitor.config.ts valid, screen map eksplisit, bottom tab atau stack-like navigation bila cocok, touch target 44-48px, safe-area/keyboard/scroll behavior masuk akal, contrast/readability sehat, state penting lengkap, seed data realistis, image fallback, motion sederhana, dan dependency tetap ramping. Buat design system semantik: atmosphere, palette roles, type scale, spacing rhythm, radii, elevation, focus/pressed states, dan icon style. Layout wajib aman di preview browser: gunakan min-h-screen, w-full, overflow-x-hidden, hindari root container absolute/fixed/rotated/translated yang membuat layar hitam atau panel keluar kanvas. Untuk baseline Capacitor + React, jangan tambahkan tailwindcss-react-native, nativewind, react-native, expo, metro, @react-navigation/*, app.json, babel.config.js, atau metro.config.js kecuali user secara eksplisit meminta React Native/Expo. Jangan membuat struktur web liar, backend tambahan, atau folder android/ios jika user hanya meminta aplikasi mobile.',
     executionChecklist: [
       "Define the core app shell, screen map, and mobile navigation pattern before writing screens",
       "Use a deterministic Capacitor + React structure with a valid capacitor.config.ts",
       "Keep touch targets, spacing, scroll containers, keyboard overlap, and safe-area behavior mobile-first",
+      "Define a compact semantic design system: atmosphere, palette roles, type scale, spacing, radii, elevation, focus and pressed states",
+      "Keep typography readable, contrast accessible, and status/error information not dependent on color alone",
+      "Keep the root app visible in browser preview with safe viewport containment and no off-canvas root transforms",
       "Build reusable screens/components rather than one giant page file",
       "Use realistic seed data, image/media fallbacks, and connected navigation targets for screens",
       "Add empty, loading, error, offline, and disabled states where the app flow needs them",
+      "Add clear tap feedback, loading feedback for slow actions, and recovery copy for errors",
       "Keep large lists mapped from data arrays with stable keys and reusable row/card components",
+      "Keep repeated content in src/data/* instead of hardcoding every card, order, product, notification, or setting row",
       "Keep one healthy main app entry and avoid fragmented package layout",
       "Avoid React Native/Expo-only packages and configs in the default Capacitor + React baseline",
       "Avoid generating android/ or ios/ native folders unless the user explicitly asks for native sync/build",
@@ -437,7 +458,7 @@ export const DEVELOPER_TASK_PRESETS = [
       "Verify the original failure and nearby regressions"
     ],
     providerModels: {
-      sumopod: 'deepseek-r1',
+      sumopod: 'deepseek-v3-2',
       openrouter: 'qwen/qwen3-coder:free',
       bytez: 'deepseek-ai/DeepSeek-R1',
       puter: 'openrouter:qwen/qwen3-coder:free',

@@ -26,7 +26,9 @@ import {
   buildStarterReplacementPrompt,
   buildVerificationRecoveryPrompt,
   buildUiReviewLoopPrompt,
+  isErrorFixPrompt,
   isLikelyCodingPrompt,
+  trimChatHistoryForAi,
   shouldRunUiReviewLoop
 } from '@/features/ai/aiWorkflowSupport';
 import { generateAiProviderResponse, prepareAiDraftBundle, type PreparedAiDraftBundle } from '@/features/ai/aiOrchestrator';
@@ -106,6 +108,172 @@ const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 const MonacoDiffEditor = lazy(() => import('@monaco-editor/react').then((module) => ({ default: module.DiffEditor })));
 
 const GITHUB_REPO_URL_PATTERN = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?(?:\/)?/i;
+
+type SumopodCatalogModel = {
+  id: string;
+  name: string;
+  provider?: string;
+  context?: number;
+  inputPrice?: number;
+  outputPrice?: number;
+};
+
+const parseCatalogNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const raw = String(value ?? '').trim();
+  if (!raw) return undefined;
+  const match = raw.match(/\$?\s*([0-9]+(?:[,.][0-9]+)*)/);
+  if (!match) return undefined;
+  const normalized = match[1].includes('.') && !match[1].includes(',')
+    ? match[1]
+    : match[1].replace(/,/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const prettifySumopodModelName = (id: string, badge?: string) => {
+  const label = id
+    .replace(/^gemini\//, 'Gemini ')
+    .replace(/^openrouter:/, '')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace(/\bGpt\b/g, 'GPT')
+    .replace(/\bGlm\b/g, 'GLM')
+    .replace(/\bMini\b/g, 'Mini');
+  return badge ? `${label} (${badge})` : label;
+};
+
+const splitDelimitedCatalogLine = (line: string) => {
+  const delimiter = line.includes('\t') ? '\t' : ',';
+  const values: string[] = [];
+  let current = '';
+  let quoted = false;
+
+  for (const char of line) {
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === delimiter && !quoted) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  values.push(current.trim());
+  return values;
+};
+
+const normalizeSumopodCatalogModel = (item: any): SumopodCatalogModel | null => {
+  const id = String(item?.id || item?.model || item?.Model || item?.slug || '').trim();
+  if (!id) return null;
+  const badge = String(item?.badge || item?.discount || item?.Discount || '').trim();
+  const name = String(item?.name || item?.displayName || item?.Name || '').trim() || prettifySumopodModelName(id, badge);
+  const provider = String(item?.provider || item?.Provider || '').trim() || undefined;
+  const context = parseCatalogNumber(item?.context ?? item?.contextLength ?? item?.context_length ?? item?.['Context Length']);
+  const inputPrice = parseCatalogNumber(item?.inputPrice ?? item?.input_price ?? item?.input ?? item?.['Input Price']);
+  const outputPrice = parseCatalogNumber(item?.outputPrice ?? item?.output_price ?? item?.output ?? item?.['Output Price']);
+
+  return {
+    id,
+    name,
+    provider,
+    context,
+    inputPrice,
+    outputPrice
+  };
+};
+
+const isLikelySumopodModelId = (line: string) => {
+  const value = line.trim();
+  if (!value) return false;
+  if (/\s/.test(value)) return false;
+  if (/^(model|provider|context|input|output|price)$/i.test(value)) return false;
+  if (/^(\/?1m tokens|90% off)$/i.test(value)) return false;
+  if (/^\$/.test(value)) return false;
+  if (/^[0-9,]+$/.test(value)) return false;
+  return /[a-z]/i.test(value) && /[-/.0-9]/.test(value);
+};
+
+const parsePlainSumopodCatalog = (raw: string) => {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^(model|provider|context length|input price|output price)$/i.test(line));
+  const models: SumopodCatalogModel[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const id = lines[index];
+    if (!isLikelySumopodModelId(id)) continue;
+
+    let cursor = index + 1;
+    const badge = /^90%\s*off$/i.test(lines[cursor] || '') ? lines[cursor++] : '';
+    const providerLine = lines[cursor++] || '';
+    const providerMatch = providerLine.match(/^([A-Za-z0-9_.-]+)\s*([0-9][0-9,]*)?$/);
+    const provider = providerMatch?.[1] || providerLine.split(/\s+/)[0] || undefined;
+    let context = parseCatalogNumber(providerMatch?.[2] || providerLine);
+
+    if (!context && /^[0-9][0-9,]*$/.test(lines[cursor] || '')) {
+      context = parseCatalogNumber(lines[cursor++]);
+    }
+
+    while (cursor < lines.length && !/^\$/.test(lines[cursor])) cursor += 1;
+    const inputPrice = parseCatalogNumber(lines[cursor++]);
+    while (cursor < lines.length && !/^\$/.test(lines[cursor])) cursor += 1;
+    const outputPrice = parseCatalogNumber(lines[cursor]);
+
+    models.push({
+      id,
+      name: prettifySumopodModelName(id, badge),
+      provider,
+      context,
+      inputPrice,
+      outputPrice
+    });
+  }
+
+  return models;
+};
+
+const parseDelimitedSumopodCatalog = (raw: string) => raw
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .filter((line) => !/^model(?:,|\t)/i.test(line))
+  .map((line) => {
+    const columns = splitDelimitedCatalogLine(line);
+    if (columns.length < 4) return null;
+    const hasDiscountColumn = /%/.test(columns[1] || '');
+    return normalizeSumopodCatalogModel({
+      id: columns[0],
+      badge: hasDiscountColumn ? columns[1] : '',
+      provider: columns[hasDiscountColumn ? 2 : 1],
+      context: columns[hasDiscountColumn ? 3 : 2],
+      inputPrice: columns[hasDiscountColumn ? 4 : 3],
+      outputPrice: columns[hasDiscountColumn ? 5 : 4]
+    });
+  })
+  .filter(Boolean) as SumopodCatalogModel[];
+
+const parseSumopodCatalogText = (raw: string) => {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.models) ? parsed.models : Array.isArray(parsed?.data) ? parsed.data : [];
+    const models = items.map(normalizeSumopodCatalogModel).filter(Boolean) as SumopodCatalogModel[];
+    if (models.length > 0) return Array.from(new Map(models.map((model) => [model.id, model])).values());
+  } catch {
+    // Continue with text-based catalog parsing.
+  }
+
+  const delimited = /,|\t/.test(trimmed) ? parseDelimitedSumopodCatalog(trimmed) : [];
+  const models = delimited.length > 0 ? delimited : parsePlainSumopodCatalog(trimmed);
+  return Array.from(new Map(models.map((model) => [model.id, model])).values());
+};
 
 
 
@@ -343,6 +511,10 @@ export default function AppFull() {
   const activeTaskPreset = useMemo(
     () => DEVELOPER_TASK_PRESETS.find((preset) => preset.id === store.aiTaskPreset) || DEVELOPER_TASK_PRESETS[0],
     [store.aiTaskPreset]
+  );
+  const isFastFixDraft = useMemo(
+    () => isErrorFixPrompt(store.chatInput, store.attachedFiles),
+    [store.chatInput, store.attachedFiles]
   );
   const activeCollectiveSkill = useMemo(
     () => AURA_COLLECTIVE.find((skill) => skill.id === store.activeAgentId || skill.name === store.selectedSkill) || null,
@@ -1996,11 +2168,38 @@ export default function AppFull() {
     });
   };
 
+  const handleImportSumopodModels = async (file: File) => {
+    try {
+      const raw = await file.text();
+      const models = parseSumopodCatalogText(raw);
+      if (models.length === 0) {
+        throw new Error('Tidak ada model SumoPod valid yang bisa dibaca dari file ini. Gunakan JSON, CSV, TSV, atau teks tabel model.');
+      }
+
+      store.setDynamicSumopodModels(models);
+      if (store.aiProvider === 'sumopod' && !models.some((model) => model.id === aiManager.activeModel)) {
+        store.setSumopodModel(models[0].id);
+      }
+
+      setWorkspaceError(`[AURA] Katalog SumoPod custom berhasil diimport: ${models.length} model dari ${file.name}.`);
+    } catch (error: any) {
+      setWorkspaceError(`[AURA] Gagal import katalog SumoPod: ${error?.message || error}`);
+    }
+  };
+
+  const handleClearSumopodModels = () => {
+    store.setDynamicSumopodModels([]);
+    if (store.aiProvider === 'sumopod') {
+      store.setSumopodModel(SUMOPOD_MODEL_FALLBACKS[0]?.id || 'seed-2-0-pro');
+    }
+    setWorkspaceError('[AURA] Katalog SumoPod custom dihapus. AURA kembali memakai katalog bawaan.');
+  };
+
   const handleAiProviderChange = (provider: AiProvider) => {
     store.setAiProvider(provider);
     if (provider === 'openrouter' && !store.openRouterModel) store.setOpenRouterModel('auto-free');
     if (provider === 'bytez' && !store.bytezModel) store.setBytezModel(BYTEZ_MODEL_FALLBACK[0]?.id || 'default');
-    if (provider === 'sumopod' && !store.sumopodModel) store.setSumopodModel('glm-5-code');
+    if (provider === 'sumopod' && !store.sumopodModel) store.setSumopodModel(SUMOPOD_MODEL_FALLBACKS[0]?.id || 'seed-2-0-pro');
     if (provider === 'puter' && !store.puterModel) store.setPuterModel('openrouter:anthropic/claude-sonnet-4.5');
     store.setShowAiPanel(true);
 
@@ -2110,7 +2309,7 @@ export default function AppFull() {
         break;
       case 'sumopod':
         store.setSumopodApiKey('');
-        store.setSumopodModel('glm-5-code');
+        store.setSumopodModel(SUMOPOD_MODEL_FALLBACKS[0]?.id || 'seed-2-0-pro');
         store.setDynamicSumopodModels([]);
         store.setSumopodSessionCookie('');
         store.setSumopodSessionAuthorization('');
@@ -2138,12 +2337,7 @@ export default function AppFull() {
     store.setAttachedFiles((prev) => prev.filter((_: AttachedFile, currentIndex: number) => currentIndex !== index));
   };
 
-  const handleChatFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files?.length) return;
-
-    const selectedFiles = Array.from(files);
-    const nextAttachments = await Promise.all(selectedFiles.map((file) => new Promise<AttachedFile>((resolve, reject) => {
+  const readFilesAsAttachments = async (selectedFiles: File[]) => Promise.all(selectedFiles.map((file) => new Promise<AttachedFile>((resolve, reject) => {
       const reader = new FileReader();
       const isImage = file.type.startsWith('image/');
       const shouldReadAsText = !isImage && (file.type.startsWith('text/') || isTextAttachmentName(file.name));
@@ -2170,12 +2364,35 @@ export default function AppFull() {
       setWorkspaceError(error?.message || 'Failed to read selected attachment.');
       return [] as AttachedFile[];
     });
+  
+  const appendChatAttachments = async (selectedFiles: File[]) => {
+    if (!selectedFiles.length) return;
+    const nextAttachments = await readFilesAsAttachments(selectedFiles);
 
     if (nextAttachments.length > 0) {
       store.setAttachedFiles((prev) => [...prev, ...nextAttachments]);
     }
+  };
+
+  const handleChatFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files?.length) return;
+
+    await appendChatAttachments(Array.from(files));
 
     event.target.value = '';
+  };
+
+  const handleChatPaste = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardFiles = Array.from(event.clipboardData?.files || []).filter((file) => file.size > 0);
+    if (!clipboardFiles.length) return;
+
+    event.preventDefault();
+    await appendChatAttachments(clipboardFiles.map((file, index) => {
+      if (file.name) return file;
+      const extension = file.type.split('/')[1] || 'bin';
+      return new File([file], `pasted-image-${Date.now()}-${index + 1}.${extension}`, { type: file.type || 'application/octet-stream' });
+    }));
   };
 
   const handleOpenChatAttachmentPicker = async () => {
@@ -2424,10 +2641,13 @@ export default function AppFull() {
     activeAiActivityIdRef.current = null;
     logDiagnostic('info', 'ai', 'Prompt send requested', prompt.slice(0, 160));
     const attachments = [...store.attachedFiles] as AttachedFile[];
+    const prioritizeFastFix = isErrorFixPrompt(prompt, attachments);
     const workDomains = detectWorkDomains(prompt, activeFile, store.files);
     const uiFirstPrompt = isUiFirstPrompt(prompt);
     const mobileFirstPrompt = /(mobile|android|ios|apk|capacitor|native app|aplikasi mobile)/i.test(prompt);
-    const effectiveTaskPresetId = mobileFirstPrompt && store.aiTaskPreset === 'fullstack'
+    const effectiveTaskPresetId = prioritizeFastFix && store.aiTaskPreset === 'fullstack'
+      ? 'bug-fix'
+      : mobileFirstPrompt && store.aiTaskPreset === 'fullstack'
       ? 'mobile-app'
       : uiFirstPrompt && store.aiTaskPreset === 'fullstack'
         ? 'frontend-ui'
@@ -2446,7 +2666,7 @@ export default function AppFull() {
     const isLikelyCodingRequest = isLikelyCodingPrompt(prompt);
     let activityId: string | null = null;
 
-    const historyBeforePrompt = [...store.chatMessages];
+    const historyBeforePrompt = trimChatHistoryForAi([...store.chatMessages], prioritizeFastFix);
     store.setChatMessages((prev) => [...prev, { role: 'user', content: buildUserPromptMessage(prompt, attachments) }]);
     store.setChatInput('');
     store.setAttachedFiles([]);
@@ -2480,7 +2700,7 @@ export default function AppFull() {
       }
       let responseText = '';
       const developerContext = buildDeveloperPromptPrefix(effectiveTaskPresetId, effectiveSkillName);
-      const attachmentContext = buildAttachmentPromptContext(attachments);
+      const attachmentContext = buildAttachmentPromptContext(attachments, { compact: prioritizeFastFix });
       const promptWithPreset = buildAiPromptEnvelope({
         developerContext,
         projectRulesContext,
@@ -2488,7 +2708,8 @@ export default function AppFull() {
         preferredTargets,
         executionPlan,
         attachmentContext,
-        prompt
+        prompt,
+        prioritizeFastFix
       });
 
       if (activityId) {
@@ -3348,6 +3569,7 @@ export default function AppFull() {
                 attachedFiles={store.attachedFiles}
                 isAiLoading={store.isAiLoading}
                 processingEntry={activeProcessingEntry}
+                fastFixMode={isFastFixDraft}
                 onOpenSettings={() => setShowAiSettings(true)}
                 onClearChat={() => {
                   store.setChatMessages([]);
@@ -3366,6 +3588,7 @@ export default function AppFull() {
                     void handleSendAiPrompt();
                   }
                 }}
+                onTextareaPaste={(event) => void handleChatPaste(event)}
               />
             </>
           )}
@@ -3404,6 +3627,8 @@ export default function AppFull() {
         onResetProvider={handleResetCurrentProvider}
         onTestConnection={() => aiManager.testAiConnection(store.aiProvider)}
         onSignInPuter={aiManager.signInPuter}
+        onImportSumopodModels={handleImportSumopodModels}
+        onClearSumopodModels={handleClearSumopodModels}
         onCredentialChange={handleAiCredentialChange}
         onToggleAutoApplyDrafts={store.setAiAutoApplyDrafts}
         onApplyDeveloperTaskPreset={handleApplyDeveloperTaskPreset}
@@ -3419,6 +3644,7 @@ export default function AppFull() {
         testingStatus={store.testingStatus[store.aiProvider]}
         testError={store.testError[store.aiProvider]}
         activeTestMeta={activeTestMeta}
+        sumopodCustomModelCount={store.dynamicSumopodModels.length}
       />
 
       <CreateProjectModal
