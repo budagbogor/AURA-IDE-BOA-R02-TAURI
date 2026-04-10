@@ -5,6 +5,7 @@ interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (path: string, projectName: string) => void;
+  isTauri: boolean;
   tauriDialog: any;
 }
 
@@ -12,6 +13,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
+  isTauri,
   tauriDialog
 }) => {
   const [path, setPath] = useState('');
@@ -20,14 +22,29 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   if (!isOpen) return null;
 
   const handleBrowse = async () => {
-    // Deteksi Tauri - Gunakan tauriDialog prop yang dioper dari App
-    const runtimeIsTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
-    
-    if (tauriDialog || runtimeIsTauri) {
+    // 1. Deteksi Prioritas: Plugin yang di-pass dari Hook (Tauri v2)
+    if (tauriDialog) {
       try {
-        // Jika tauriDialog belum di-load tapi runtimeIsTauri benar, kita mungkin perlu menunggu atau 
-        // menggunakan import dinamis, tapi tauriDialog prop harusnya sudah cukup jika di-pass benar.
-        const dialog = tauriDialog || (window as any).__TAURI__?.dialog;
+        const selected = await tauriDialog.open({
+          directory: true,
+          multiple: false,
+          title: 'Select Destination Folder'
+        });
+        if (selected && typeof selected === 'string') {
+          const normalizedPath = selected.replace(/\\/g, '/');
+          setPath(normalizedPath);
+        }
+        return;
+      } catch (err) {
+        console.error('Failed to browse folder via tauriDialog prop:', err);
+      }
+    }
+
+    // 2. Fallback: Global Tauri (Jika diizinkan di tauri.conf.json)
+    const runtimeIsTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+    if (runtimeIsTauri) {
+      try {
+        const dialog = (window as any).__TAURI__?.dialog;
         if (dialog) {
           const selected = await dialog.open({
             directory: true,
@@ -41,7 +58,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           return;
         }
       } catch (err) {
-        console.error('Failed to browse folder:', err);
+        console.error('Failed to browse folder via global Tauri:', err);
       }
     }
 

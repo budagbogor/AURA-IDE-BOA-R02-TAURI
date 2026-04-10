@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAppStore } from '../store/useAppStore';
 import { fetchUserRepos, fetchUserProfile, cloneRepository } from '../services/githubService';
 
 interface UseGithubProps {
@@ -177,7 +178,10 @@ export const useGithub = ({
     }
   };
 
+  const store = useAppStore();
+
   return {
+    ...store,
     githubConnected,
     githubToken,
     setGithubToken,

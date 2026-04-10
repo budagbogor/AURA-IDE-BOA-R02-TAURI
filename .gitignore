@@ -7,3 +7,8 @@ coverage/
 *.log
 .env*
 !.env.example
+releases/
+.aura-smoke-flow/
+.aura-smoke-v15359/
+temp_ai_modal_block.txt
+temp_ai_panel_block.txt

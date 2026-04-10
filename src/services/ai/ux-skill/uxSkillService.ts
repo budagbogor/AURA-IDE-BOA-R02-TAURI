@@ -1,28 +1,21 @@
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import stylesCsv from './styles.csv?raw';
+import reasoningCsv from './ui-reasoning.csv?raw';
+import guidelinesCsv from './ux-guidelines.csv?raw';
 
 export async function getUXContext(): Promise<string> {
   try {
-    // In a real Tauri app, we'd need to know the base path. 
-    // Since we are in the source code, we assume the files are available via relative paths if bundled, 
-    // or we use the known path structure.
-    
-    // For this implementation, we'll try to read from the expected locations.
-    const styles = await readTextFile('src/services/ai/ux-skill/styles.csv').catch(() => '');
-    const reasoning = await readTextFile('src/services/ai/ux-skill/ui-reasoning.csv').catch(() => '');
-    const guidelines = await readTextFile('src/services/ai/ux-skill/ux-guidelines.csv').catch(() => '');
-
     return `
 [UI/UX PRO MAX INTELLIGENCE - ACTIVE]
 The following design system data is available for reasoning:
 
 --- DESIGN STYLES ---
-${styles}
+${stylesCsv}
 
 --- DESIGN REASONING ---
-${reasoning}
+${reasoningCsv}
 
 --- UX GUIDELINES ---
-${guidelines}
+${guidelinesCsv}
 
 Instructions:
 1. Use the Spacing Rhythm (8dp) for all layout decisions.

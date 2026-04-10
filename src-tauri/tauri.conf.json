@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "AURA AI IDE",
-  "version": "15.3.7",
+  "version": "15.3.158",
   "identifier": "com.aura.ide",
   "build": {
     "frontendDist": "../dist",
@@ -27,6 +27,11 @@
   "plugins": {},
   "bundle": {
     "active": true,
+    "publisher": "B.O.A. Indonesia",
+    "shortDescription": "AI-powered hybrid development environment for desktop and web workflows.",
+    "longDescription": "AURA AI IDE is a Tauri-based development environment that combines AI-assisted coding, terminal automation, project preview, and native workspace sync for professional desktop workflows.",
+    "copyright": "Copyright (c) 2026 B.O.A. Indonesia",
+    "category": "DeveloperTool",
     "targets": [
       "nsis",
       "msi"

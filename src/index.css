@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Google Sans Text", "Google Sans", "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
   /* UI/UX Pro Max Spacing Rhythm (8dp) */
@@ -27,13 +27,15 @@
   }
   body {
     @apply bg-[#0a0a0a] text-[#ededef] font-sans antialiased;
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+  input, textarea, select, button {
+    font: inherit;
   }
   button, a, [role="button"], summary {
     cursor: pointer;
-    @apply transition-all duration-150;
-  }
-  button:active, [role="button"]:active {
-    @apply scale-[0.98];
+    @apply transition-colors duration-150;
   }
   button:disabled, a[disabled], [role="button"][disabled] {
     cursor: not-allowed;
@@ -48,34 +50,7 @@
     @apply bg-black/40 backdrop-blur-2xl border border-white/5;
   }
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
-    @apply transition-all duration-300;
-  }
-  .glass-card:hover {
-    @apply bg-white/[0.08] border-white/20;
-  }
-  .bg-aura-gradient {
-    background: linear-gradient(145deg, rgba(59, 130, 246, 0.1) 0%, rgba(10, 10, 10, 0.5) 100%);
-  }
-  .bg-aura-glow {
-    background: radial-gradient(circle at 50% 0%, rgba(94, 106, 210, 0.15) 0%, transparent 70%);
-  }
-  .text-glow-blue {
-    text-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
-  }
-  .text-glow-emerald {
-    text-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
-  }
-  .pro-max-glow {
-    @apply relative overflow-hidden;
-  }
-  .pro-max-glow::after {
-    content: '';
-    @apply absolute inset-0 bg-gradient-to-r from-blue-500/0 via-white/10 to-blue-500/0 -translate-x-full;
-    animation: shimmer 3s infinite;
-  }
-  @keyframes shimmer {
-    100% { transform: translateX(100%); }
+    @apply bg-white/5 border border-white/10;
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
@@ -111,7 +86,7 @@
 }
 
 .markdown-body {
-  @apply text-sm leading-relaxed text-[#cccccc];
+  @apply text-[12px] leading-relaxed text-[#cccccc];
 }
 
 .markdown-body p {
@@ -119,7 +94,7 @@
 }
 
 .markdown-body code {
-  @apply bg-white/5 px-1.5 py-0.5 rounded text-blue-300 font-mono text-[12px];
+  @apply bg-white/5 px-1.5 py-0.5 rounded text-blue-300 font-mono text-[11px];
 }
 
 .markdown-body pre {
@@ -127,11 +102,11 @@
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-  @apply font-bold mb-3 text-white tracking-tight;
+  @apply font-semibold mb-3 text-white tracking-tight;
 }
 
-.markdown-body h1 { @apply text-xl border-b border-white/10 pb-2 ml-[-4px] pl-1; }
-.markdown-body h2 { @apply text-lg; }
+.markdown-body h1 { @apply text-[18px] border-b border-white/10 pb-2 ml-[-4px] pl-1; }
+.markdown-body h2 { @apply text-[15px]; }
 
 .markdown-body ul, .markdown-body ol {
   @apply mb-4 ml-6 list-disc space-y-1;

@@ -77,8 +77,8 @@ interface SidebarProps {
   relayout: (preset: 'default' | 'zen') => void;
   setLayoutMode: (mode: 'classic' | 'modern') => void;
   setZenMode: (mode: boolean) => void;
-  aiProvider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama';
-  setAiProvider: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama') => void;
+  aiProvider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'puter' | 'ollama';
+  setAiProvider: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'puter' | 'ollama') => void;
   geminiApiKey: string;
   setGeminiApiKey: (key: string) => void;
   selectedModel: string;
@@ -125,7 +125,7 @@ interface SidebarProps {
   activeMcpLogs: string[];
   setActiveMcpLogs: (logs: string[]) => void;
   testingStatus: Record<string, 'idle' | 'loading' | 'success' | 'error'>;
-  testAiConnection: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'ollama') => Promise<void>;
+  testAiConnection: (provider: 'gemini' | 'openrouter' | 'bytez' | 'sumopod' | 'puter' | 'ollama') => Promise<void>;
   testGithubConnection: () => Promise<void>;
   resetAllConnections: () => void;
   testError: Record<string, string>;
